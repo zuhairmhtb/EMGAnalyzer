@@ -15,3 +15,7 @@ This is a Python based Software under development for the automation of EMG Sign
 
 (N.B: The 'Signal Classification' tab is under development which will contain options for classification of EMG signals. The functions for segmentation, classification and decomposition of EMG signal are included in 'segmentation_control_window.py' and 'classification_control_window.py' respectively).
 
+4. Screenshots:
+![alt text](https://github.com/zuhairmhtb/EMGAnalyzer/blob/master/screenshot_1.JPG)
+![alt text](https://github.com/zuhairmhtb/EMGAnalyzer/blob/master/screenshot_2.JPG)
+![alt text](https://github.com/zuhairmhtb/EMGAnalyzer/blob/master/screenshot_3.JPG)
