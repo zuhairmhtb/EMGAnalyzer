@@ -23,8 +23,8 @@ from scipy.signal import butter, lfilter, spectrogram, find_peaks, iirfilter
 import  scipy.fftpack as fftpack
 from skimage.feature import peak_local_max
 
-from MyNet.temp.emg_editor_pyqt.segmention_control_window import SegmentationControlWinow
-from MyNet.temp.emg_editor_pyqt.classification_control_window import ClassificationControlWinow
+from segmention_control_window import SegmentationControlWinow
+from classification_control_window import ClassificationControlWinow
 class App(QMainWindow):
 
     def __init__(self):
