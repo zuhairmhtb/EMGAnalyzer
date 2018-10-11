@@ -41,6 +41,9 @@ class SegmentationControlWinow(QWidget):
         self.segment_amp_rise_duration = 0.1
         self.segment_amp_rise_threshold = 40
         self.segment_threshold_calculated = 'N/A'
+        self.save_preprocessed_data_file = "preprocessed_data"
+        self.save_preprocessing_params_file = "preprocessing_params"
+        self.save_peaks_file = "peaks"
 
         self.voltage_gain_label = QLabel('Voltage Gain(/uV): ', self)
         self.voltage_gain_input = QLineEdit(self)
@@ -99,6 +102,7 @@ class SegmentationControlWinow(QWidget):
         self.segment_threshold_calculated_label = QLabel('Minimum Peak Amplitude Threshold(uV): ', self)
         self.segment_threshold_calculated_input = QLabel('N/A', self)
 
+
         self.peak_detection_threshold_widget = QGroupBox('Peak detection Parameters', self)
         self.peak_detection_threshold_widget_layout = QHBoxLayout()
         self.peak_detection_threshold_widget.setLayout(self.peak_detection_threshold_widget_layout)
@@ -129,6 +133,14 @@ class SegmentationControlWinow(QWidget):
         self.peak_detection_threshold_right_widget_layout.addWidget(self.segment_threshold_calculated_label)
         self.peak_detection_threshold_right_widget_layout.addWidget(self.segment_threshold_calculated_input)
 
+        self.save_preprocessed_data_checkbox = QCheckBox('Save Preprocessed data', self)
+        self.save_peaks_checkbox = QCheckBox('Save Peaks', self)
+        self.save_checkbox_widget = QGroupBox('Save Parameters', self)
+        self.save_checkbox_widget_layout = QHBoxLayout()
+        self.save_checkbox_widget.setLayout(self.save_checkbox_widget_layout)
+        self.save_checkbox_widget_layout.addWidget(self.save_preprocessed_data_checkbox)
+        self.save_checkbox_widget_layout.addWidget(self.save_peaks_checkbox)
+
 
         self.save_controls_button = QPushButton('Save parameters', self)
         self.save_controls_button.clicked.connect(self.save_params)
@@ -136,6 +148,7 @@ class SegmentationControlWinow(QWidget):
         self.layout.addWidget(self.voltage_gain_widget)
         self.layout.addWidget(self.data_sample_crop_widget)
         self.layout.addWidget(self.peak_detection_threshold_widget)
+        self.layout.addWidget(self.save_checkbox_widget)
         self.layout.addWidget(self.save_controls_button)
 
         self.setLayout(self.layout)
@@ -308,6 +321,7 @@ class SegmentationControlWinow(QWidget):
     def get_muap_sample_length(self, fs):
         return int((fs * self.segment_window) / 1000)
     def get_muap_waveforms(self, peaks, data, fs):
+
         sample_length = self.get_muap_sample_length(fs)
         sample_left = int(sample_length/2)
         sample_right = sample_length - sample_left
