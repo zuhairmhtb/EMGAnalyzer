@@ -23,8 +23,21 @@ from scipy.signal import butter, lfilter, spectrogram, find_peaks, iirfilter
 import  scipy.fftpack as fftpack
 from skimage.feature import peak_local_max
 
-from segmention_control_window import SegmentationControlWinow
-from classification_control_window import ClassificationControlWinow
+from MyNet.temp.emg_editor_pyqt.segmention_control_window import SegmentationControlWinow
+from MyNet.temp.emg_editor_pyqt.classification_control_window import ClassificationControlWindow
+
+class LoadingMessage(QWidget):
+    def __init__(self):
+        QWidget.__init__(self)
+        self.layout = QHBoxLayout()
+        self.message = QLabel('Message', self)
+        self.layout.addWidget(self.message)
+        self.setLayout(self.layout)
+    def enable(self, message=""):
+        self.show()
+        self.message.setText("Loading..." + str(message))
+    def disable(self):
+        self.hide()
 class App(QMainWindow):
 
     def __init__(self):
@@ -142,7 +155,8 @@ class MyTableWidget(QWidget):
         self.classification_section_canvas.draw()
 
         self.segmentation_control_window = SegmentationControlWinow()
-        self.classification_control_window = ClassificationControlWinow()
+        self.classification_control_window = ClassificationControlWindow()
+        self.loading_window = LoadingMessage()
 
 
         self.layout = QVBoxLayout(self)
@@ -695,9 +709,14 @@ class MyTableWidget(QWidget):
         fs = self.read_sampling_rate(os.path.join(self.get_current_data_path(), 'data.hea'))
         cropped_data = self.segmentation_control_window.crop_input_data(self.current_data)
         filtered = self.segmentation_control_window.filter_data(cropped_data,fs)
+        if self.segmentation_control_window.save_preprocessed_data_checkbox.isChecked():
+            np.save(os.path.join(self.get_current_data_path(), self.segmentation_control_window.save_preprocessed_data_file), filtered)
         peaks = self.segmentation_control_window.detect_peaks(
             filtered, fs
         )
+        if self.segmentation_control_window.save_peaks_checkbox.isChecked():
+            np.save(os.path.join(self.get_current_data_path(), self.segmentation_control_window.save_peaks_file), peaks)
+
 
 
         self.segmentation_section_ax[0].clear()
@@ -711,8 +730,12 @@ class MyTableWidget(QWidget):
         fs = self.read_sampling_rate(os.path.join(self.get_current_data_path(), 'data.hea'))
         cropped_data = self.segmentation_control_window.crop_input_data(self.current_data)
         filtered = self.segmentation_control_window.filter_data(cropped_data, fs)
+        if self.segmentation_control_window.save_preprocessed_data_checkbox.isChecked():
+            np.save(os.path.join(self.get_current_data_path(), self.segmentation_control_window.save_preprocessed_data_file), filtered)
         peaks = self.segmentation_control_window.detect_peaks(filtered, fs)
         validated_peaks = self.segmentation_control_window.validate_peaks(filtered, fs, peaks)
+        if self.segmentation_control_window.save_peaks_checkbox.isChecked():
+            np.save(os.path.join(self.get_current_data_path(), self.segmentation_control_window.save_peaks_file), validated_peaks)
 
         self.segmentation_section_ax[0].clear()
         self.segmentation_section_ax[0].plot(filtered, 'b-')
@@ -728,8 +751,12 @@ class MyTableWidget(QWidget):
         fs = self.read_sampling_rate(os.path.join(self.get_current_data_path(), 'data.hea'))
         cropped_data = self.segmentation_control_window.crop_input_data(self.current_data)
         filtered = self.segmentation_control_window.filter_data(cropped_data, fs)
+        if self.segmentation_control_window.save_preprocessed_data_checkbox.isChecked():
+            np.save(os.path.join(self.get_current_data_path(), self.segmentation_control_window.save_preprocessed_data_file), filtered)
         peaks = self.segmentation_control_window.detect_peaks(filtered, fs)
         validated_peaks = self.segmentation_control_window.validate_peaks(filtered, fs, peaks)
+        if self.segmentation_control_window.save_peaks_checkbox.isChecked():
+            np.save(os.path.join(self.get_current_data_path(), self.segmentation_control_window.save_peaks_file), validated_peaks)
         waveforms, firing_time = self.segmentation_control_window.get_muap_waveforms(validated_peaks, filtered, fs)
 
         if len(waveforms) > 0:
@@ -750,9 +777,29 @@ class MyTableWidget(QWidget):
             self.update_firing_table(firing_time, waveform_classes, waveform_superimposition, append=True)
 
             if self.classification_control_window.perform_muap_decomposition_checkbox.isChecked():
-                self.classification_control_window.perform_emg_decomposition(
+                self.loading_window.enable("Performing Decomposition of Superimposed Signals")
+                updated_muaps, residue_superimposed = self.classification_control_window.perform_emg_decomposition(
                     waveforms, waveform_classes, waveform_superimposition, firing_time
                 )
+                self.loading_window.disable()
+                print('Decomposition Complete')
+                ft = []
+                classes = []
+                superimposition = [0] * len(updated_muaps)
+                for i in range(len(updated_muaps)):
+                    ft.append(updated_muaps[i][2])
+                    classes.append(updated_muaps[i][1])
+                self.update_firing_table(ft, classes, superimposition, append=True)
+            if self.classification_control_window.save_muap_waveform_checkbox.isChecked():
+                np.save(os.path.join(self.get_current_data_path(), self.classification_control_window.save_muap_waveform_file), waveforms)
+            if self.classification_control_window.save_muap_classes_checkbox.isChecked():
+                np.save(os.path.join(self.get_current_data_path(), self.classification_control_window.save_muap_classes_file), waveform_classes)
+            if self.classification_control_window.save_muap_superimposition_checkbox.isChecked():
+                np.save(os.path.join(self.get_current_data_path(), self.classification_control_window.save_muap_superimposition_file), waveform_superimposition)
+            if self.classification_control_window.save_muap_firing_time_checkbox.isChecked():
+                np.save(os.path.join(self.get_current_data_path(), self.classification_control_window.save_muap_firing_time_file), firing_time)
+            if self.classification_control_window.save_muap_firing_table_checkbox.isChecked():
+                np.save(os.path.join(self.get_current_data_path(), self.classification_control_window.save_muap_firing_table_file), self.firing_table)
 
             waveforms_detected = {i: 0 for i in range(self.output_motor_classes)}
             superimposition_detected = {i: 0 for i in range(self.output_motor_classes)}
@@ -785,11 +832,27 @@ class MyTableWidget(QWidget):
             self.segmentation_section_ax[0].plot(filtered, 'b-')
             for i in range(len(self.firing_table)):
                 if len(self.firing_table[i])> 0:
+                    print('Motor unit: ' + str(i+1))
+                    print('Firing time: ' + str(self.firing_table[i]))
+                    print('Total fires: ' + str(len(self.firing_table[i])))
+                    print('Total data points: ' + str(len(filtered)))
+
                     self.firing_table_section_ax[0].plot( (np.asarray(self.firing_table[i])*1000)/fs, [i+1]*len(self.firing_table[i]), 'x')
                     self.segmentation_section_ax[0].plot(self.firing_table[i], np.asarray(filtered)[self.firing_table[i]], 'o')
 
+            for i in range(len(self.firing_table)):
+                if len(self.firing_table[i])> 0:
+                    blanks = []
+                    for j in range(len(filtered)):
+                        if not (j in self.firing_table[i]):
+                            blanks.append(j)
+                    self.firing_table_section_ax[0].plot((np.asarray(blanks) * 1000) / fs, [i + 1] * len(blanks), '-')
+
+
             self.firing_table_section_canvas.draw()
             self.segmentation_section_canvas.draw()
+
+
 
 
         else:
