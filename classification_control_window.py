@@ -369,161 +369,166 @@ class ClassificationControlWindow(QWidget):
         # For each superimposed waveform perform the following tasks
         cur = 0
         while not superimposed_queue.empty():
-            print('Superimposed waveform left: ' + str(superimposed_queue.qsize()))
-            cur += 1
-            smuap = superimposed_queue.get()
-            if len(smuap[0] < len(actual_muaps[0][0])):
-                smuap[0] = list(smuap[0]) + [smuap[0][-1]]*(len(actual_muaps[0][0])-len(smuap[0]))
-            # Cross correlate each reduced MUAP with the superimposed waveform x and find the best matching point
-            # i.e. the points where crosscorrelation takes the maximum value
+            try:
+                print('Superimposed waveform left: ' + str(superimposed_queue.qsize()))
+                cur += 1
+                smuap = superimposed_queue.get()
+                if len(smuap[0] < len(actual_muaps[0][0])):
+                    smuap[0] = list(smuap[0]) + [smuap[0][-1]] * (len(actual_muaps[0][0]) - len(smuap[0]))
+                # Cross correlate each reduced MUAP with the superimposed waveform x and find the best matching point
+                # i.e. the points where crosscorrelation takes the maximum value
 
-            print('Crosscorrelating superimposed waveform of length: ' + str(len(smuap[0])))
+                print('Crosscorrelating superimposed waveform of length: ' + str(len(smuap[0])))
 
-            best_matching_points = []  # Best matching point and maximum correlation coefficient for each MUAP with the superimposed waveform
-            nds = []  # Normalized Euclidean distance for each matching pair
-            ads = []  # Average Area Difference for each matching pair
-            ths = []  # Varying Threshold for each matching pair
-            adjusted_waveforms = []
-            for j in range(len(actual_muaps)):
-                print("Correlating with reduced MUAP of length: " + str(len(actual_muaps[j][0])))
+                best_matching_points = []  # Best matching point and maximum correlation coefficient for each MUAP with the superimposed waveform
+                nds = []  # Normalized Euclidean distance for each matching pair
+                ads = []  # Average Area Difference for each matching pair
+                ths = []  # Varying Threshold for each matching pair
+                adjusted_waveforms = []
+                for j in range(len(actual_muaps)):
+                    print("Correlating with reduced MUAP of length: " + str(len(actual_muaps[j][0])))
 
-                if pearson_correlate:
-                    x = np.asarray(smuap[0]).astype(np.float64) / np.std(smuap[0])
-                    y = np.asarray(actual_muaps[j][0]).astype(np.float64) / np.std(actual_muaps[j][0])
+                    if pearson_correlate:
+                        x = np.asarray(smuap[0]).astype(np.float64) / np.std(smuap[0])
+                        y = np.asarray(actual_muaps[j][0]).astype(np.float64) / np.std(actual_muaps[j][0])
+                    else:
+                        x = np.asarray(smuap[0]).astype(np.float64)
+                        y = np.asarray(actual_muaps[j][0]).astype(np.float64)
+                    correlation = correlate(x, y)
+                    print("Cross correlation shape: " + str(len(correlation)))
+                    print('Maximum Coefficient: ' + str(np.amax(correlation)) + " at index " + str(
+                        np.argmax(correlation)))
+                    highest_cor_ind = np.argmax(correlation)
+                    best_matching_points.append([correlation[highest_cor_ind], highest_cor_ind])
+                    # Calculate normalized Euclidean Distance, Average Area Difference and Varying Threshold for the
+                    # matching pair i.e the actual muap and portion of the superimposed waveform that has the highest
+                    # similarity with the muap
+
+                    if highest_cor_ind < len(smuap[0]) - 1:
+                        print('Less')
+                        smuap_start = 0
+                        smuap_end = highest_cor_ind + 1
+                        muap_start = len(actual_muaps[j][0]) - highest_cor_ind - 1
+                        muap_end = len(actual_muaps[j][0])
+
+                    elif highest_cor_ind == len(smuap[0]) - 1:
+                        smuap_start = 0
+                        smuap_end = len(smuap[0])
+                        muap_start = 0
+                        muap_end = len(actual_muaps[j][0])
+                    else:
+                        print('More')
+                        smuap_start = highest_cor_ind - (len(smuap[0]) - 1)
+                        smuap_end = len(smuap[0])
+                        muap_start = 0
+                        muap_end = len(actual_muaps[j][0]) - (highest_cor_ind - len(smuap[0]) + 1)
+                    print(str(cur) + ', ' + str(j))
+
+                    adjusted_superimposed = np.asarray(smuap[0])[smuap_start:smuap_end]
+                    adjusted_muap = np.asarray(actual_muaps[j][0])[muap_start:muap_end]
+                    adjusted_waveforms.append(
+                        [adjusted_superimposed, adjusted_muap, [smuap_start, smuap_end], [muap_start, muap_end]])
+
+                    nd = np.sum(np.subtract(adjusted_superimposed, adjusted_muap) ** 2) / np.sum(
+                        np.multiply(adjusted_muap, adjusted_muap))
+                    nds.append(nd)
+                    # Average Area Difference
+                    ad = np.sum(np.abs(np.subtract(adjusted_superimposed, adjusted_muap))) / len(adjusted_muap)
+                    ads.append(ad)
+                    # Varying Threshold
+                    threshold_const_a = 0.5
+                    threshold_const_b = 4
+                    th = threshold_const_b + threshold_const_a * np.sum(np.abs(adjusted_muap)) / len(adjusted_muap)
+                    ths.append(th)
+
+                # Matching pair with minimum classification coefficient
+
+                nd_thresh1 = 0.2
+                nd_thresh2 = 0.5
+
+                best_matching_muap = -1
+                min_coeff_thresh = sys.maxsize
+                for j in range(len(best_matching_points)):
+                    if (nds[j] < nd_thresh1 or (ads[j] < ths[j] and nds[j] < nd_thresh2)):
+                        class_coeff = (nds[j] * ads[j]) / (ths[j] * len(adjusted_muap))
+                        if class_coeff < min_coeff_thresh:
+                            best_matching_muap = j
+                            min_coeff_thresh = class_coeff
+
+                if best_matching_muap >= 0:
+                    # A MUAP Class is identified for the superimposed waveform.
+                    # Decompose the superimposed waveform from the MUAP class.
+                    class_smuap = list(smuap[0])
+                    class_muap = list(actual_muaps[best_matching_muap][0])
+                    residue_signal = []
+                    highest_cor_ind = best_matching_points[best_matching_muap][1]
+                    # Pad MUAP and SMUAP arrays with zero in order to make them equal length and subtract
+                    if highest_cor_ind < len(smuap[0]):
+                        class_smuap = [0] * adjusted_waveforms[best_matching_muap][3][0] + class_smuap
+                        class_muap = class_muap + [0] * adjusted_waveforms[best_matching_muap][3][0]
+                        class_smuap_start = adjusted_waveforms[best_matching_muap][3][0]
+                        class_smuap_end = adjusted_waveforms[best_matching_muap][3][0] + len(smuap[0])
+                    elif highest_cor_ind > len(smuap[0]):
+                        class_muap = [0] * adjusted_waveforms[best_matching_muap][2][0] + class_muap
+                        class_smuap = class_smuap + [0] * adjusted_waveforms[best_matching_muap][2][0]
+                        class_smuap_start = 0
+                        class_smuap_end = len(smuap[0])
+
+                    # Calculate residue signal
+                    residue_signal = np.subtract(class_smuap, class_muap)
+                    max_residue_amp = 30  # uV
+                    if np.amax(residue_signal[class_smuap_start:class_smuap_end]) < max_residue_amp:
+                        # If the max amplitude of residue signal is greater than threshold, then feed it back to the
+                        # queue for further decomposition
+                        smuap[0] = residue_signal[class_smuap_start:class_smuap_end]
+                        superimposed_queue.put(smuap)
+                    else:
+                        # Else add it to the list of decomposed residue signal
+                        residue_superimposed_muaps.append(smuap)
+                    # Update Firing time of the Best Matching MUAP with the firing time of the superimposed signal
+                    actual_muaps[best_matching_muap][2] += smuap[2]
+                    if plot:
+                        plt.subplot(3, 1, 1)
+                        plt.title('Best Matching MUAP: Cross Correlation Index: ' + str(highest_cor_ind))
+                        plt.plot(smuap[0], label='SMUAP')
+                        plt.plot(np.arange(highest_cor_ind - len(actual_muaps[best_matching_muap][0]), highest_cor_ind),
+                                 actual_muaps[best_matching_muap][0],
+                                 label='MUAP')
+                        plt.plot(residue_signal[class_smuap_start:class_smuap_end], label='Residue')
+                        plt.grid()
+                        plt.legend()
+                        plt.subplot(3, 1, 2)
+                        plt.title(
+                            'Nd: ' + str(nds[best_matching_muap]) + ', Ad: ' + str(ads[best_matching_muap]) +
+                            ', Th: ' + str(ths[best_matching_muap]) + ', Coeff: ' + str(min_coeff_thresh))
+                        plt.plot(adjusted_waveforms[best_matching_muap][0],
+                                 label='SMUAP: ' + str(
+                                     adjusted_waveforms[best_matching_muap][2][1] -
+                                     adjusted_waveforms[best_matching_muap][2][
+                                         0]))
+                        plt.plot(adjusted_waveforms[best_matching_muap][1], label='MUAP: ' + str(
+                            adjusted_waveforms[best_matching_muap][3][1] - adjusted_waveforms[best_matching_muap][3][
+                                0]))
+                        plt.grid()
+                        plt.legend()
+
+                        plt.subplot(3, 1, 3)
+                        plt.title('Decomposition')
+                        plt.plot(class_smuap, label='SMUAP')
+                        plt.plot(class_muap, label='MUAP')
+                        plt.plot(residue_signal, label='Residue')
+                        plt.grid()
+                        plt.legend()
+
+                        plt.show()
+
+
                 else:
-                    x = np.asarray(smuap[0]).astype(np.float64)
-                    y = np.asarray(actual_muaps[j][0]).astype(np.float64)
-                correlation = correlate(x, y)
-                print("Cross correlation shape: " + str(len(correlation)))
-                print('Maximum Coefficient: ' + str(np.amax(correlation)) + " at index " + str(
-                    np.argmax(correlation)))
-                highest_cor_ind = np.argmax(correlation)
-                best_matching_points.append([correlation[highest_cor_ind], highest_cor_ind])
-                # Calculate normalized Euclidean Distance, Average Area Difference and Varying Threshold for the
-                # matching pair i.e the actual muap and portion of the superimposed waveform that has the highest
-                # similarity with the muap
-
-                if highest_cor_ind < len(smuap[0]) - 1:
-                    print('Less')
-                    smuap_start = 0
-                    smuap_end = highest_cor_ind + 1
-                    muap_start = len(actual_muaps[j][0]) - highest_cor_ind - 1
-                    muap_end = len(actual_muaps[j][0])
-
-                elif highest_cor_ind == len(smuap[0]) - 1:
-                    smuap_start = 0
-                    smuap_end = len(smuap[0])
-                    muap_start = 0
-                    muap_end = len(actual_muaps[j][0])
-                else:
-                    print('More')
-                    smuap_start = highest_cor_ind - (len(smuap[0]) - 1)
-                    smuap_end = len(smuap[0])
-                    muap_start = 0
-                    muap_end = len(actual_muaps[j][0]) - (highest_cor_ind - len(smuap[0]) + 1)
-                print(str(cur) + ', ' + str(j))
-
-                adjusted_superimposed = np.asarray(smuap[0])[smuap_start:smuap_end]
-                adjusted_muap = np.asarray(actual_muaps[j][0])[muap_start:muap_end]
-                adjusted_waveforms.append(
-                    [adjusted_superimposed, adjusted_muap, [smuap_start, smuap_end], [muap_start, muap_end]])
-
-                nd = np.sum(np.subtract(adjusted_superimposed, adjusted_muap) ** 2) / np.sum(
-                    np.multiply(adjusted_muap, adjusted_muap))
-                nds.append(nd)
-                # Average Area Difference
-                ad = np.sum(np.abs(np.subtract(adjusted_superimposed, adjusted_muap))) / len(adjusted_muap)
-                ads.append(ad)
-                # Varying Threshold
-                threshold_const_a = 0.5
-                threshold_const_b = 4
-                th = threshold_const_b + threshold_const_a * np.sum(np.abs(adjusted_muap)) / len(adjusted_muap)
-                ths.append(th)
-
-            # Matching pair with minimum classification coefficient
-
-            nd_thresh1 = 0.2
-            nd_thresh2 = 0.5
-
-            best_matching_muap = -1
-            min_coeff_thresh = sys.maxsize
-            for j in range(len(best_matching_points)):
-                if (nds[j] < nd_thresh1 or (ads[j] < ths[j] and nds[j] < nd_thresh2)):
-                    class_coeff = (nds[j] * ads[j]) / (ths[j] * len(adjusted_muap))
-                    if class_coeff < min_coeff_thresh:
-                        best_matching_muap = j
-                        min_coeff_thresh = class_coeff
-
-            if best_matching_muap >= 0:
-                # A MUAP Class is identified for the superimposed waveform.
-                # Decompose the superimposed waveform from the MUAP class.
-                class_smuap = list(smuap[0])
-                class_muap = list(actual_muaps[best_matching_muap][0])
-                residue_signal = []
-                highest_cor_ind = best_matching_points[best_matching_muap][1]
-                # Pad MUAP and SMUAP arrays with zero in order to make them equal length and subtract
-                if highest_cor_ind < len(smuap[0]):
-                    class_smuap = [0] * adjusted_waveforms[best_matching_muap][3][0] + class_smuap
-                    class_muap = class_muap + [0] * adjusted_waveforms[best_matching_muap][3][0]
-                    class_smuap_start = adjusted_waveforms[best_matching_muap][3][0]
-                    class_smuap_end = adjusted_waveforms[best_matching_muap][3][0] + len(smuap[0])
-                elif highest_cor_ind > len(smuap[0]):
-                    class_muap = [0] * adjusted_waveforms[best_matching_muap][2][0] + class_muap
-                    class_smuap = class_smuap + [0] * adjusted_waveforms[best_matching_muap][2][0]
-                    class_smuap_start = 0
-                    class_smuap_end = len(smuap[0])
-
-                # Calculate residue signal
-                residue_signal = np.subtract(class_smuap, class_muap)
-                max_residue_amp = 30  # uV
-                if np.amax(residue_signal[class_smuap_start:class_smuap_end]) < max_residue_amp:
-                    # If the max amplitude of residue signal is greater than threshold, then feed it back to the
-                    # queue for further decomposition
-                    smuap[0] = residue_signal[class_smuap_start:class_smuap_end]
-                    superimposed_queue.put(smuap)
-                else:
-                    # Else add it to the list of decomposed residue signal
+                    print("No Class identified for the superimposed waveform. Removing it from the list")
                     residue_superimposed_muaps.append(smuap)
-                # Update Firing time of the Best Matching MUAP with the firing time of the superimposed signal
-                actual_muaps[best_matching_muap][2] += smuap[2]
-                if plot:
-                    plt.subplot(3, 1, 1)
-                    plt.title('Best Matching MUAP: Cross Correlation Index: ' + str(highest_cor_ind))
-                    plt.plot(smuap[0], label='SMUAP')
-                    plt.plot(np.arange(highest_cor_ind - len(actual_muaps[best_matching_muap][0]), highest_cor_ind),
-                             actual_muaps[best_matching_muap][0],
-                             label='MUAP')
-                    plt.plot(residue_signal[class_smuap_start:class_smuap_end], label='Residue')
-                    plt.grid()
-                    plt.legend()
-                    plt.subplot(3, 1, 2)
-                    plt.title(
-                        'Nd: ' + str(nds[best_matching_muap]) + ', Ad: ' + str(ads[best_matching_muap]) +
-                        ', Th: ' + str(ths[best_matching_muap]) + ', Coeff: ' + str(min_coeff_thresh))
-                    plt.plot(adjusted_waveforms[best_matching_muap][0],
-                             label='SMUAP: ' + str(
-                                 adjusted_waveforms[best_matching_muap][2][1] -
-                                 adjusted_waveforms[best_matching_muap][2][
-                                     0]))
-                    plt.plot(adjusted_waveforms[best_matching_muap][1], label='MUAP: ' + str(
-                        adjusted_waveforms[best_matching_muap][3][1] - adjusted_waveforms[best_matching_muap][3][0]))
-                    plt.grid()
-                    plt.legend()
+            except:
+                print("Error occured here")
 
-                    plt.subplot(3, 1, 3)
-                    plt.title('Decomposition')
-                    plt.plot(class_smuap, label='SMUAP')
-                    plt.plot(class_muap, label='MUAP')
-                    plt.plot(residue_signal, label='Residue')
-                    plt.grid()
-                    plt.legend()
-
-                    plt.show()
-
-
-            else:
-                print("No Class identified for the superimposed waveform. Removing it from the list")
-                residue_superimposed_muaps.append(smuap)
 
         return actual_muaps, residue_superimposed_muaps
 
