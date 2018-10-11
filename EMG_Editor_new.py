@@ -15,7 +15,7 @@ from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
-
+import MyNet.temp.emg_editor_pyqt.muap_analysis_functions as analysis_functions
 import random
 from win32api import GetSystemMetrics
 
@@ -165,11 +165,13 @@ class MyTableWidget(QWidget):
         self.tabs = QTabWidget()
         self.tab1 = QWidget()
         self.tab2 = QWidget()
+        self.tab3 = QWidget()
         self.tabs.resize(300, 200)
 
         # Add tabs
         self.tabs.addTab(self.tab1, "PreProcessing Tab")
         self.tabs.addTab(self.tab2, "MUAP Analysis Tab")
+        self.tabs.addTab(self.tab3, "MUAP Analysis Output Tab")
 
 
         # Create first tab
@@ -179,6 +181,10 @@ class MyTableWidget(QWidget):
         # Create Second tab
         self.initMUAPAnalysisUI()
         self.tab2.setLayout(self.muap_an_tab_layout)
+
+        # Create Third tab
+        self.initMUAPAnalysisOutputUI()
+        self.tab3.setLayout(self.muap_analysis_output_tab_layout)
 
 
 
@@ -790,6 +796,14 @@ class MyTableWidget(QWidget):
                     ft.append(updated_muaps[i][2])
                     classes.append(updated_muaps[i][1])
                 self.update_firing_table(ft, classes, superimposition, append=True)
+
+            # Update Analysis Output Tab
+            print('Analyzing MUAP...')
+            for i in range(len(self.muap_analysis_features)):
+                if self.muap_analysis_feature_widget_child_widgets[i][3].isChecked():
+                    self.muap_analysis_feature_functions[i](waveforms, waveform_classes, waveform_superimposition, firing_time, fs, filtered)
+            print('MUAP Analysis complete...')
+            # Update Analysis Tab
             if self.classification_control_window.save_muap_waveform_checkbox.isChecked():
                 np.save(os.path.join(self.get_current_data_path(), self.classification_control_window.save_muap_waveform_file), waveforms)
             if self.classification_control_window.save_muap_classes_checkbox.isChecked():
@@ -937,6 +951,213 @@ class MyTableWidget(QWidget):
         self.classification_section_widget_layout.addWidget(self.classification_section_toolbar_widget)
         #self.classification_section_widget_layout.addWidget(QLabel("Hello", self))
         self.muap_an_tab_layout.addWidget(self.classification_section_widget)
+
+    def calculate_amp_difference(self, muaps, output_classes, output_superimposition, firing_time, fs, signal):
+        peaks_thresh = -1
+        window = self.segmentation_control_window.segment_window
+        muaps = np.asarray(muaps)
+        output_classes = np.asarray(output_classes)
+        output_superimposition = np.asarray(output_superimposition)
+
+        actual_muaps = muaps[output_superimposition == 0]
+        actual_output_classes = output_classes[output_superimposition == 0]
+
+        amp_difference = analysis_functions.calculate_amplitude_difference(actual_muaps, peaks_thresh)
+        outputs = ["" for _ in range(self.output_motor_classes)]
+        for i in range(len(actual_muaps)):
+            outputs[actual_output_classes[i]] = outputs[actual_output_classes[i]] + "{0:.5f}".format(amp_difference[i]) + "\n"
+        for i in range(len(outputs)):
+            self.muap_analysis_feature_widget_child_widgets[0][2][i].setText(outputs[i])
+
+    def calculate_duration(self, muaps, output_classes, output_superimposition, firing_time, fs, signal):
+        peaks_thresh = -1
+        window = self.segmentation_control_window.segment_window
+        muaps = np.asarray(muaps)
+        output_classes = np.asarray(output_classes)
+        output_superimposition = np.asarray(output_superimposition)
+
+        actual_muaps = muaps[output_superimposition == 0]
+        actual_output_classes = output_classes[output_superimposition == 0]
+
+        durations, end_points = analysis_functions.calculate_waveform_duration(actual_muaps, window)
+        outputs = ["" for _ in range(self.output_motor_classes)]
+        for i in range(len(actual_muaps)):
+            outputs[actual_output_classes[i]] = outputs[actual_output_classes[i]] + "{0:.5f}".format(durations[i]) + "\n"
+        for i in range(len(outputs)):
+            self.muap_analysis_feature_widget_child_widgets[1][2][i].setText(outputs[i])
+
+    def calculate_rect_area(self, muaps, output_classes, output_superimposition, firing_time, fs, signal):
+        peaks_thresh = -1
+        window = self.segmentation_control_window.segment_window
+        muaps = np.asarray(muaps)
+        output_classes = np.asarray(output_classes)
+        output_superimposition = np.asarray(output_superimposition)
+
+        actual_muaps = muaps[output_superimposition == 0]
+        actual_output_classes = output_classes[output_superimposition == 0]
+
+        rect_area = analysis_functions.calculate_rectified_waveform_area(actual_muaps, window)
+        outputs = ["" for _ in range(self.output_motor_classes)]
+        for i in range(len(actual_muaps)):
+            outputs[actual_output_classes[i]] = outputs[actual_output_classes[i]] + "{0:.5f}".format(rect_area[i]) + "\n"
+        for i in range(len(outputs)):
+            self.muap_analysis_feature_widget_child_widgets[2][2][i].setText(outputs[i])
+
+    def calculate_rise_time(self, muaps, output_classes, output_superimposition, firing_time, fs, signal):
+        peaks_thresh = -1
+        window = self.segmentation_control_window.segment_window
+        muaps = np.asarray(muaps)
+        output_classes = np.asarray(output_classes)
+        output_superimposition = np.asarray(output_superimposition)
+
+        actual_muaps = muaps[output_superimposition == 0]
+        actual_output_classes = output_classes[output_superimposition == 0]
+
+        rise_time = analysis_functions.calculate_rise_time(actual_muaps, window, peaks_thresh)
+        outputs = ["" for _ in range(self.output_motor_classes)]
+        for i in range(len(actual_muaps)):
+            outputs[actual_output_classes[i]] = outputs[actual_output_classes[i]] + "{0:.5f}".format(rise_time[i]) + "\n"
+        for i in range(len(outputs)):
+            self.muap_analysis_feature_widget_child_widgets[3][2][i].setText(outputs[i])
+
+    def calculate_phases(self, muaps, output_classes, output_superimposition, firing_time, fs, signal):
+        peaks_thresh = -1
+        window = self.segmentation_control_window.segment_window
+        muaps = np.asarray(muaps)
+        output_classes = np.asarray(output_classes)
+        output_superimposition = np.asarray(output_superimposition)
+
+        actual_muaps = muaps[output_superimposition == 0]
+        actual_output_classes = output_classes[output_superimposition == 0]
+
+        phases = analysis_functions.calculate_phase(actual_muaps, window)
+        outputs = ["" for _ in range(self.output_motor_classes)]
+        for i in range(len(actual_muaps)):
+            outputs[actual_output_classes[i]] = outputs[actual_output_classes[i]] + "{0:.5f}".format(phases[i]) + "\n"
+        for i in range(len(outputs)):
+            self.muap_analysis_feature_widget_child_widgets[4][2][i].setText(outputs[i])
+
+    def calculate_turns(self, muaps, output_classes, output_superimposition, firing_time, fs, signal):
+        peaks_thresh = -1
+        window = self.segmentation_control_window.segment_window
+        muaps = np.asarray(muaps)
+        output_classes = np.asarray(output_classes)
+        output_superimposition = np.asarray(output_superimposition)
+
+        actual_muaps = muaps[output_superimposition == 0]
+        actual_output_classes = output_classes[output_superimposition == 0]
+
+        turns = analysis_functions.calculate_turns(actual_muaps, window, peaks_thresh)
+        outputs = ["" for _ in range(self.output_motor_classes)]
+        for i in range(len(actual_muaps)):
+            outputs[actual_output_classes[i]] = outputs[actual_output_classes[i]] + "{0:.5f}".format(turns[i]) + "\n"
+        for i in range(len(outputs)):
+            self.muap_analysis_feature_widget_child_widgets[5][2][i].setText(outputs[i])
+
+    def calculate_firing_rate(self, muaps, output_classes, output_superimposition, firing_time, fs, signal):
+
+        window = self.segmentation_control_window.segment_window
+        outputs = ["" for _ in range(self.output_motor_classes)]
+        total_duration = len(signal) / fs
+        for i in range(self.output_motor_classes):
+            firing_pattern = self.firing_table[i]
+            total = len(firing_pattern)
+            firing_rate = total / total_duration
+            outputs[i] = outputs[i] + "{0:.5f}".format(firing_rate) + "\n"
+            self.muap_analysis_feature_widget_child_widgets[6][2][i].setText(outputs[i])
+
+    def calculate_mad_isi(self, muaps, output_classes, output_superimposition, firing_time, fs, signal):
+        ...
+
+    def calculate_std_isi(self, muaps, output_classes, output_superimposition, firing_time, fs, signal):
+        ...
+
+    def calculate_mean_isi(self, muaps, output_classes, output_superimposition, firing_time, fs, signal):
+        ...
+
+    def calculate_freq_tlocked_muap(self, muaps, output_classes, output_superimposition, firing_time, fs, signal):
+        ...
+    def initMUAPAnalysisOutputUI(self):
+        self.muap_analysis_output_tab_layout = QHBoxLayout()
+
+        self.muap_waveform_analysis_widget = QGroupBox('MUAP Waveform Analysis')
+        self.muap_waveform_analysis_widget_layout = QVBoxLayout()
+        self.muap_waveform_analysis_widget.setLayout(self.muap_waveform_analysis_widget_layout)
+        self.firing_table_analysis_widget = QGroupBox('Firing Table Analysis')
+        self.firing_table_analysis_widget_layout = QVBoxLayout()
+        self.firing_table_analysis_widget.setLayout(self.firing_table_analysis_widget_layout)
+
+        self.muap_analysis_output_tab_layout.addWidget(self.muap_waveform_analysis_widget)
+        self.muap_analysis_output_tab_layout.addWidget(self.firing_table_analysis_widget)
+
+        self.muap_analysis_features = ["Amplitude Difference(uV):Min -ve and Max+ve Peaks",
+                                       "Duration(ms)",
+                                       "Rectified Area(Integrated over calculated duration)",
+                                       "Rise Time(ms):Time difference between Max -ve and preceeding Min +ve Peak",
+                                       "Phases",
+                                       "Turns(No. of +ve and -ve Peaks)",
+                                       "Firing Rate",
+                                       "Mean Absolute Deviation of Inter Spike Interval(ISI)",
+                                       "Standard Deviation of ISI",
+                                       "Mean of ISI",
+                                       "Frequency of Time locked MUAPs",
+                                       ]
+        self.muap_analysis_feature_type = [
+            "waveform", "waveform", "waveform", "waveform", "waveform", "waveform",
+            "firing_table", "firing_table", "firing_table", "firing_table", "firing_table"
+        ]
+        self.muap_analysis_feature_functions = [self.calculate_amp_difference,
+                                                self.calculate_duration,
+                                                self.calculate_rect_area,
+                                                self.calculate_rise_time,
+                                                self.calculate_phases,
+                                                self.calculate_turns,
+                                                self.calculate_firing_rate,
+                                                self.calculate_mad_isi,
+                                                self.calculate_std_isi,
+                                                self.calculate_mean_isi,
+                                                self.calculate_freq_tlocked_muap]
+
+        self.muap_analysis_feature_scrollareas = [QScrollArea(self.parent) for _ in range(len(self.muap_analysis_features))]
+        self.muap_analysis_feature_widgets = [QGroupBox("MUAP Waveform " + self.muap_analysis_features[i], self.muap_analysis_feature_scrollareas[i])
+                                              for i in range(len(self.muap_analysis_features))]
+        self.muap_analysis_feature_widget_layouts = [QHBoxLayout() for _ in range(len(self.muap_analysis_features))]
+
+        self.muap_analysis_feature_widget_child_widgets = [
+            [
+                [
+                    QGroupBox('MU ' + str(i), self) for i in range(self.output_motor_classes)
+                ],
+                [
+                    QVBoxLayout() for _ in range(self.output_motor_classes)
+                ],
+                [
+                    QLabel("N/A", self) for _ in range(self.output_motor_classes)
+                ],
+                QCheckBox("Calculate Parameters", self)
+
+            ] for _ in range(len(self.muap_analysis_features))
+        ]
+        for i in range(len(self.muap_analysis_features)):
+
+            self.muap_analysis_feature_scrollareas[i].setWidgetResizable(True)
+            self.muap_analysis_feature_scrollareas[i].setWidget(self.muap_analysis_feature_widgets[i])
+            self.muap_analysis_feature_widgets[i].setLayout(self.muap_analysis_feature_widget_layouts[i])
+            self.muap_analysis_feature_widget_child_widgets[i][3].setChecked(True)
+            for j in range(self.output_motor_classes):
+                self.muap_analysis_feature_widget_child_widgets[i][2][j].setWordWrap(True)
+                self.muap_analysis_feature_widget_child_widgets[i][0][j].setLayout(self.muap_analysis_feature_widget_child_widgets[i][1][j])
+                self.muap_analysis_feature_widget_child_widgets[i][1][j].addWidget(self.muap_analysis_feature_widget_child_widgets[i][2][j])
+                self.muap_analysis_feature_widget_layouts[i].addWidget(self.muap_analysis_feature_widget_child_widgets[i][0][j])
+            self.muap_analysis_feature_widget_layouts[i].addWidget(self.muap_analysis_feature_widget_child_widgets[i][3])
+            if self.muap_analysis_feature_type[i] == "waveform":
+                self.muap_waveform_analysis_widget_layout.addWidget(self.muap_analysis_feature_scrollareas[i])
+            elif self.muap_analysis_feature_type[i] == "firing_table":
+                self.firing_table_analysis_widget_layout.addWidget(self.muap_analysis_feature_scrollareas[i])
+
+
+
+
 
 
 
