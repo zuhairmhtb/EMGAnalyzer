@@ -41,6 +41,7 @@ class ClassificationControlWindow(QWidget):
         self.save_muap_superimposition_file = "muap_superimposition_classes"
         self.save_muap_firing_time_file = "muap_firing_time"
         self.save_muap_firing_table_file = "muap_firing_table"
+        self.debug_mode = False
 
 
 
@@ -144,7 +145,9 @@ class ClassificationControlWindow(QWidget):
         self.layout.addWidget(self.save_param_button)
         self.setLayout(self.layout)
         self.display_param()
-
+    def debug_output(self, text):
+        if self.debug_mode:
+            print(text)
     def reset_default(self):
         self.ann_init_weight = 0.0001
         self.ann_init_midweight_times = 0.01
@@ -218,19 +221,19 @@ class ClassificationControlWindow(QWidget):
         node_winning_amount = [0 for _ in range(muap_size[0])]
         for _ in range(epochs):
             for i in range(len(muaps)):
-                print('....Current MUAP shape: ' + str(len(muaps[i])))
-                print('....Current Weight Shape: ' + str(len(weights[0])))
+                self.debug_output('....Current MUAP shape: ' + str(len(muaps[i])))
+                self.debug_output('....Current Weight Shape: ' + str(len(weights[0])))
                 distance_k = [np.sum(np.square(np.asarray(muaps[i]) - weights[j])) for j in range(muap_size[0])]
                 winner_node = np.argmin(distance_k)
                 node_winning_amount[winner_node] += 1
-                print('....Min Distance for MUAP No. ' + str(i) + ': ' + str(distance_k[winner_node]))
+                self.debug_output('....Min Distance for MUAP No. ' + str(i) + ': ' + str(distance_k[winner_node]))
 
                 # Weight adjustment for each output node - LEARNING PHASE 1
                 g = self.learning_rate  # 0 < g < 1
                 t = 0
                 for k in range(len(weights)):
                     t = t + 1  # No.of iteration: starts from 1
-                    print('........Adjusting weights for outputput node ' + str(k))
+                    self.debug_output('........Adjusting weights for outputput node ' + str(k))
 
                     if (k == winner_node and node_winning_amount[k] == 1):
                         gaussian_hk = 1
@@ -238,12 +241,12 @@ class ClassificationControlWindow(QWidget):
                         gaussian_hk = 1
                     else:
                         gaussian_hk = g * math.exp(-(k - winner_node) ** 2 * t / 2) / math.sqrt(node_winning_amount[k])
-                    print('........Gaussian Value: ' + str(gaussian_hk))
+                    self.debug_output('........Gaussian Value: ' + str(gaussian_hk))
                     if gaussian_hk >= 0.005:
-                        print('........Adapting Weights')
+                        self.debug_output('........Adapting Weights')
                         for x in range(1, weights.shape[1]):
                             weights[k][x] = weights[k][x - 1] + gaussian_hk * (muaps[i][x] - weights[k][x - 1])
-                print('-----------------------------------------------------------------\n')
+                self.debug_output('-----------------------------------------------------------------\n')
         return weights
 
     def lvq_learning_phase(self, muaps, input_nodes, output_nodes, weights, epochs=1):
@@ -252,21 +255,21 @@ class ClassificationControlWindow(QWidget):
         lvq_gaussian_hk = self.lvq_gaussian_hk
         for _ in range(epochs):
             for i in range(len(muaps)):
-                print('....Current MUAP shape: ' + str(len(muaps[i])))
-                print('....Current Weight Shape: ' + str(len(weights[0])))
+                self.debug_output('....Current MUAP shape: ' + str(len(muaps[i])))
+                self.debug_output('....Current Weight Shape: ' + str(len(weights[0])))
                 distance_k = [np.sum(np.square(np.asarray(muaps[i]) - weights[j])) for j in range(muap_size[0])]
                 winner_node = np.argmin(distance_k)
                 second_winner_node = np.argpartition(distance_k, 1)[1]
                 node_winning_amount[winner_node] += 1
                 node_winning_amount[second_winner_node] += 1
-                print('....Min Distance for MUAP No. ' + str(i) + ': ' + str(distance_k[winner_node]))
+                self.debug_output('....Min Distance for MUAP No. ' + str(i) + ': ' + str(distance_k[winner_node]))
 
                 # Weight adjustment for each output node - LEARNING PHASE 1
                 g = 1  # 0 < g < 1
                 t = i + 1  # No.of iteration: starts from 1
                 #rint('........Adjusting weights for outputput node ' + str(k))
 
-                print('........Gaussian Value: ' + str(lvq_gaussian_hk))
+                self.debug_output('........Gaussian Value: ' + str(lvq_gaussian_hk))
                 for x in range(1, weights.shape[1]):
                     weights[winner_node][x] = weights[winner_node][x - 1] + lvq_gaussian_hk * (
                             muaps[i][x] - weights[winner_node][x - 1])
@@ -291,7 +294,7 @@ class ClassificationControlWindow(QWidget):
             muap_classification_class[i] = winner_node
 
             length_kw = np.sum(weights[winner_node] ** 2)
-            print(
+            self.debug_output(
                 'Classification Threshold for MUAP No. ' + str(i + 1) + ': ' + str(distance_k[winner_node] / length_kw))
             if distance_k[winner_node] / length_kw < self.classification_superimposition_thresh:
                 muap_classification_output[i] = 0
@@ -347,7 +350,7 @@ class ClassificationControlWindow(QWidget):
 
     def perform_emg_decomposition(self, waveforms, waveform_classes, waveform_superimposition, firing_time,
                                       calculate_endpoints=False, pearson_correlate=True, plot=False):
-        print('Waveform: ' + str(len(waveforms)))
+        self.debug_output('Waveform: ' + str(len(waveforms)))
         max_residue_amp = 30
         # Separate Actual and Superimposed Waveform
         actual_muaps = []
@@ -360,8 +363,8 @@ class ClassificationControlWindow(QWidget):
 
             else:
                 superimposed_muaps.append([waveforms[i], waveform_classes[i], firing_time[i]])
-        print('Actual MUAPS: ' + str(len(actual_muaps)))
-        print('Superimposed MUAPS: ' + str(len(superimposed_muaps)))
+        self.debug_output('Actual MUAPS: ' + str(len(actual_muaps)))
+        self.debug_output('Superimposed MUAPS: ' + str(len(superimposed_muaps)))
 
         # Create a queue that will hold the superimposed waveforms that needs to be decomposed
         superimposed_queue = queue.Queue()
@@ -371,7 +374,7 @@ class ClassificationControlWindow(QWidget):
         cur = 0
         while not superimposed_queue.empty():
             try:
-                print('Superimposed waveform left: ' + str(superimposed_queue.qsize()))
+                self.debug_output('Superimposed waveform left: ' + str(superimposed_queue.qsize()))
                 cur += 1
                 smuap = superimposed_queue.get()
                 if len(smuap[0] < len(actual_muaps[0][0])):
@@ -379,7 +382,7 @@ class ClassificationControlWindow(QWidget):
                 # Cross correlate each reduced MUAP with the superimposed waveform x and find the best matching point
                 # i.e. the points where crosscorrelation takes the maximum value
 
-                print('Crosscorrelating superimposed waveform of length: ' + str(len(smuap[0])))
+                self.debug_output('Crosscorrelating superimposed waveform of length: ' + str(len(smuap[0])))
 
                 best_matching_points = []  # Best matching point and maximum correlation coefficient for each MUAP with the superimposed waveform
                 nds = []  # Normalized Euclidean distance for each matching pair
@@ -387,7 +390,7 @@ class ClassificationControlWindow(QWidget):
                 ths = []  # Varying Threshold for each matching pair
                 adjusted_waveforms = []
                 for j in range(len(actual_muaps)):
-                    print("Correlating with reduced MUAP of length: " + str(len(actual_muaps[j][0])))
+                    self.debug_output("Correlating with reduced MUAP of length: " + str(len(actual_muaps[j][0])))
 
                     if pearson_correlate:
                         x = np.asarray(smuap[0]).astype(np.float64) / np.std(smuap[0])
@@ -396,8 +399,8 @@ class ClassificationControlWindow(QWidget):
                         x = np.asarray(smuap[0]).astype(np.float64)
                         y = np.asarray(actual_muaps[j][0]).astype(np.float64)
                     correlation = correlate(x, y)
-                    print("Cross correlation shape: " + str(len(correlation)))
-                    print('Maximum Coefficient: ' + str(np.amax(correlation)) + " at index " + str(
+                    self.debug_output("Cross correlation shape: " + str(len(correlation)))
+                    self.debug_output('Maximum Coefficient: ' + str(np.amax(correlation)) + " at index " + str(
                         np.argmax(correlation)))
                     highest_cor_ind = np.argmax(correlation)
                     best_matching_points.append([correlation[highest_cor_ind], highest_cor_ind])
@@ -406,7 +409,7 @@ class ClassificationControlWindow(QWidget):
                     # similarity with the muap
 
                     if highest_cor_ind < len(smuap[0]) - 1:
-                        print('Less')
+                        self.debug_output('Less')
                         smuap_start = 0
                         smuap_end = highest_cor_ind + 1
                         muap_start = len(actual_muaps[j][0]) - highest_cor_ind - 1
@@ -418,12 +421,12 @@ class ClassificationControlWindow(QWidget):
                         muap_start = 0
                         muap_end = len(actual_muaps[j][0])
                     else:
-                        print('More')
+                        self.debug_output('More')
                         smuap_start = highest_cor_ind - (len(smuap[0]) - 1)
                         smuap_end = len(smuap[0])
                         muap_start = 0
                         muap_end = len(actual_muaps[j][0]) - (highest_cor_ind - len(smuap[0]) + 1)
-                    print(str(cur) + ', ' + str(j))
+                    self.debug_output(str(cur) + ', ' + str(j))
 
                     adjusted_superimposed = np.asarray(smuap[0])[smuap_start:smuap_end]
                     adjusted_muap = np.asarray(actual_muaps[j][0])[muap_start:muap_end]
@@ -525,16 +528,16 @@ class ClassificationControlWindow(QWidget):
 
 
                 else:
-                    print("No Class identified for the superimposed waveform. Removing it from the list")
+                    self.debug_output("No Class identified for the superimposed waveform. Removing it from the list")
                     residue_superimposed_muaps.append(smuap)
             except:
-                print("Error occured here")
+                self.debug_output("Error occured here")
 
 
             else:
                 superimposed_muaps.append([waveforms[i], waveform_classes[i], firing_time[i]])
-        print('Actual MUAPS: ' + str(len(actual_muaps)))
-        print('Superimposed MUAPS: ' + str(len(superimposed_muaps)))
+        self.debug_output('Actual MUAPS: ' + str(len(actual_muaps)))
+        self.debug_output('Superimposed MUAPS: ' + str(len(superimposed_muaps)))
 
         # Create a queue that will hold the superimposed waveforms that needs to be decomposed
         superimposed_queue = queue.Queue()
@@ -544,7 +547,7 @@ class ClassificationControlWindow(QWidget):
         cur = 0
         while not superimposed_queue.empty():
             try:
-                print('Superimposed waveform left: ' + str(superimposed_queue.qsize()))
+                self.debug_output('Superimposed waveform left: ' + str(superimposed_queue.qsize()))
                 cur += 1
                 smuap = superimposed_queue.get()
                 if len(smuap[0] < len(actual_muaps[0][0])):
@@ -552,7 +555,7 @@ class ClassificationControlWindow(QWidget):
                 # Cross correlate each reduced MUAP with the superimposed waveform x and find the best matching point
                 # i.e. the points where crosscorrelation takes the maximum value
 
-                print('Crosscorrelating superimposed waveform of length: ' + str(len(smuap[0])))
+                self.debug_output('Crosscorrelating superimposed waveform of length: ' + str(len(smuap[0])))
 
                 best_matching_points = []  # Best matching point and maximum correlation coefficient for each MUAP with the superimposed waveform
                 nds = []  # Normalized Euclidean distance for each matching pair
@@ -560,7 +563,7 @@ class ClassificationControlWindow(QWidget):
                 ths = []  # Varying Threshold for each matching pair
                 adjusted_waveforms = []
                 for j in range(len(actual_muaps)):
-                    print("Correlating with reduced MUAP of length: " + str(len(actual_muaps[j][0])))
+                    self.debug_output("Correlating with reduced MUAP of length: " + str(len(actual_muaps[j][0])))
 
                     if pearson_correlate:
                         x = np.asarray(smuap[0]).astype(np.float64) / np.std(smuap[0])
@@ -569,8 +572,8 @@ class ClassificationControlWindow(QWidget):
                         x = np.asarray(smuap[0]).astype(np.float64)
                         y = np.asarray(actual_muaps[j][0]).astype(np.float64)
                     correlation = correlate(x, y)
-                    print("Cross correlation shape: " + str(len(correlation)))
-                    print('Maximum Coefficient: ' + str(np.amax(correlation)) + " at index " + str(
+                    self.debug_output("Cross correlation shape: " + str(len(correlation)))
+                    self.debug_output('Maximum Coefficient: ' + str(np.amax(correlation)) + " at index " + str(
                         np.argmax(correlation)))
                     highest_cor_ind = np.argmax(correlation)
                     best_matching_points.append([correlation[highest_cor_ind], highest_cor_ind])
@@ -579,7 +582,7 @@ class ClassificationControlWindow(QWidget):
                     # similarity with the muap
 
                     if highest_cor_ind < len(smuap[0]) - 1:
-                        print('Less')
+                        self.debug_output('Less')
                         smuap_start = 0
                         smuap_end = highest_cor_ind + 1
                         muap_start = len(actual_muaps[j][0]) - highest_cor_ind - 1
@@ -591,12 +594,12 @@ class ClassificationControlWindow(QWidget):
                         muap_start = 0
                         muap_end = len(actual_muaps[j][0])
                     else:
-                        print('More')
+                        self.debug_output('More')
                         smuap_start = highest_cor_ind - (len(smuap[0]) - 1)
                         smuap_end = len(smuap[0])
                         muap_start = 0
                         muap_end = len(actual_muaps[j][0]) - (highest_cor_ind - len(smuap[0]) + 1)
-                    print(str(cur) + ', ' + str(j))
+                    self.debug_output(str(cur) + ', ' + str(j))
 
                     adjusted_superimposed = np.asarray(smuap[0])[smuap_start:smuap_end]
                     adjusted_muap = np.asarray(actual_muaps[j][0])[muap_start:muap_end]
@@ -698,20 +701,15 @@ class ClassificationControlWindow(QWidget):
 
 
                 else:
-                    print("No Class identified for the superimposed waveform. Removing it from the list")
+                    self.debug_output("No Class identified for the superimposed waveform. Removing it from the list")
                     residue_superimposed_muaps.append(smuap)
             except:
-                print("Error occured here")
+                self.debug_output("Error occured here")
 
-
-<<<<<<< HEAD
             else:
-                print("No Class identified for the superimposed waveform. Removing it from the list")
+                self.debug_output("No Class identified for the superimposed waveform. Removing it from the list")
                 residue_superimposed_muaps.append(smuap)
 
-
-=======
->>>>>>> 9b6bc1df28bc6c2b81dab0c370b1f911cdd0740d
         return actual_muaps, residue_superimposed_muaps
 
 
@@ -741,9 +739,6 @@ a = np.load(dir+"muap_waveforms.npy")
 b = np.load(dir+"muap_output_classes.npy")
 c = np.load(dir+"muap_superimposition_classes.npy")
 d = np.load(dir+"muap_firing_time.npy")
-print(a.shape)
-print(b.shape)
-print(c.shape)
-print(d.shape)
+
 #ClassificationControlWindow.perform_emg_decomposition(None, a, b, c, d, plot=True)
 #perform_cross_correlation(1, 2)

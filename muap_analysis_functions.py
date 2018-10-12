@@ -12,6 +12,11 @@ Available functions:
 "Turns(No. of +ve and -ve Peaks)"]
 """
 
+debug_mode = False
+def debug_output(text):
+    if debug_mode:
+        print(text)
+        
 def calculate_amplitude_difference(muaps, min_peak_thresh=-1):
     """
 
@@ -189,9 +194,9 @@ def calculate_turns(muaps, window_duration, min_peak_thresh=-1, trim_muap=False)
         neg_peaks, _ = find_peaks(muap*-1, peak_thresh)
 
         total_peaks = list(pos_peak) + list(neg_peaks)
-        print(total_peaks)
-        print(pos_peak)
-        print(neg_peaks)
+        debug_output(total_peaks)
+        debug_output(pos_peak)
+        debug_output(neg_peaks)
         peak_signs = [1]*len(pos_peak) + [-1]* len(neg_peaks)
         sorted_index = np.argsort(total_peaks)
         total_peaks = np.asarray(total_peaks)[sorted_index]

@@ -27,7 +27,7 @@ class SegmentationControlWinow(QWidget):
     def __init__(self):
         QWidget.__init__(self)
         self.layout = QVBoxLayout()
-
+        self.debug_mode = False
         self.voltage_gain = 13.1070
         self.filter_low_pass = 2000
         self.filter_high_pass = 20
@@ -154,7 +154,9 @@ class SegmentationControlWinow(QWidget):
         self.setLayout(self.layout)
         self.display_params()
 
-
+    def debug_output(self, text):
+        if self.debug_mode:
+            print(text)
     def reset_default(self):
         self.voltage_gain = 13.1070
         self.filter_low_pass = 2000

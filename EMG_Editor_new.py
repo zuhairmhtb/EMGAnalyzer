@@ -85,7 +85,7 @@ class MyTableWidget(QWidget):
             'wheat', 'cyan'
         ]
 
-
+        self.debug_mode = False
         self.data = self.get_dataset()
         self.preprocess_tab_fig = plt.figure(1)
         self.preprocess_tab_ax = []
@@ -192,7 +192,9 @@ class MyTableWidget(QWidget):
         self.layout.addWidget(self.tabs)
         self.setLayout(self.layout)
 
-
+    def debug_output(self, text):
+        if self.debug_mode:
+            print(text)
     def butter_bandpass(self, cutoff_freqs, fs, btype, order=5):
         nyq = 0.5 * fs
         for i in range(len(cutoff_freqs)):
@@ -275,7 +277,7 @@ class MyTableWidget(QWidget):
             if output_superimposition[i] == 0:
                 self.firing_table[output_class[i]] += firing_time[i]
 
-        print(self.firing_table)
+        self.debug_output(self.firing_table)
 
     def get_dataset(self):
         data_type = {}
@@ -296,7 +298,7 @@ class MyTableWidget(QWidget):
                                     if os.path.isdir(rec_p):
                                         data_type[dt][disease][pat][rec] = rec_p
 
-        print(data_type)
+        self.debug_output(data_type)
         return data_type
     def get_current_data_path(self):
         return self.data[str(self.data_type_widget.currentText())][str(self.disease_type_widget.currentText())][str(self.patient_id_widget.currentText())][str(self.record_widget.currentText())]
@@ -443,10 +445,7 @@ class MyTableWidget(QWidget):
                 msg = f.read()
         buttonReply = QMessageBox.question(self, 'PyQt5 message', msg,
                                            QMessageBox.Ok, QMessageBox.Ok)
-        if buttonReply == QMessageBox.Ok:
-            print('Yes clicked.')
-        else:
-            print('No clicked.')
+
     def fft_activate_button_action(self):
         if self.fft_activate_box.isChecked():
             window = str(self.fft_window.text())
@@ -497,7 +496,7 @@ class MyTableWidget(QWidget):
             thresh_per = int(self.peak_height.value())
             height = thresh_min + int(((thresh_max-thresh_min)*thresh_per)/100)
             peaks, props = find_peaks(data, height=height)
-            print('Peak Minimum Threshold: ' + str(thresh_per) + '% greater than mean amplitude')
+            self.debug_output('Peak Minimum Threshold: ' + str(thresh_per) + '% greater than mean amplitude')
             self.peak_total_label.setText(str(len(peaks)))
             self.preprocess_tab_ax[0].plot(peaks, self.current_data[peaks], 'x')
         self.preprocess_tab_canvas.draw()
@@ -800,6 +799,7 @@ class MyTableWidget(QWidget):
             # Update Analysis Output Tab
             print('Analyzing MUAP...')
             for i in range(len(self.muap_analysis_features)):
+
                 if self.muap_analysis_feature_widget_child_widgets[i][3].isChecked():
                     self.muap_analysis_feature_functions[i](waveforms, waveform_classes, waveform_superimposition, firing_time, fs, filtered)
             print('MUAP Analysis complete...')
@@ -846,10 +846,10 @@ class MyTableWidget(QWidget):
             self.segmentation_section_ax[0].plot(filtered, 'b-')
             for i in range(len(self.firing_table)):
                 if len(self.firing_table[i])> 0:
-                    print('Motor unit: ' + str(i+1))
-                    print('Firing time: ' + str(self.firing_table[i]))
-                    print('Total fires: ' + str(len(self.firing_table[i])))
-                    print('Total data points: ' + str(len(filtered)))
+                    self.debug_output('Motor unit: ' + str(i+1))
+                    self.debug_output('Firing time: ' + str(self.firing_table[i]))
+                    self.debug_output('Total fires: ' + str(len(self.firing_table[i])))
+                    self.debug_output('Total data points: ' + str(len(filtered)))
 
                     self.firing_table_section_ax[0].plot( (np.asarray(self.firing_table[i])*1000)/fs, [i+1]*len(self.firing_table[i]), 'x')
                     self.segmentation_section_ax[0].plot(self.firing_table[i], np.asarray(filtered)[self.firing_table[i]], 'o')
