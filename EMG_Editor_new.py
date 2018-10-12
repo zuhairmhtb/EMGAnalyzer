@@ -1055,28 +1055,88 @@ class MyTableWidget(QWidget):
             self.muap_analysis_feature_widget_child_widgets[5][2][i].setText(outputs[i])
 
     def calculate_firing_rate(self, muaps, output_classes, output_superimposition, firing_time, fs, signal):
-
-        window = self.segmentation_control_window.segment_window
-        outputs = ["" for _ in range(self.output_motor_classes)]
         total_duration = len(signal) / fs
+        firing_rates = []
         for i in range(self.output_motor_classes):
             firing_pattern = self.firing_table[i]
             total = len(firing_pattern)
             firing_rate = total / total_duration
-            outputs[i] = outputs[i] + "{0:.5f}".format(firing_rate) + "\n"
-            self.muap_analysis_feature_widget_child_widgets[6][2][i].setText(outputs[i])
+            firing_rates.append(firing_rate)
+            self.muap_analysis_feature_widget_child_widgets[6][2][i].setText("{0:.5f}".format(firing_rate))
+    def calculate_interspike_interval(self):
+        interspike_intervals = []
+        for i in range(self.output_motor_classes):
+            firing_pattern = self.firing_table[i]
+            interspike_intervals.append([self.firing_table[i][j+1] - self.firing_table[i][j] for j in range(len(self.firing_table[i])-1)])
+        return interspike_intervals
 
     def calculate_mad_isi(self, muaps, output_classes, output_superimposition, firing_time, fs, signal):
-        ...
+
+        isi = self.calculate_interspike_interval()
+
+        mads = []
+        for i in range(self.output_motor_classes):
+            if len(isi[i]) > 0:
+                intervals = np.asarray(isi[i])
+                intervals = (intervals*1000)/fs
+                mean_isi = np.mean(intervals)
+                deviation = np.abs(intervals - mean_isi)
+                mad = np.sum(deviation)/len(deviation)
+            else:
+                mad = 0
+            mads.append(mad)
+
+            self.muap_analysis_feature_widget_child_widgets[7][2][i].setText("{0:.5f}".format(mad))
+        return mads
 
     def calculate_std_isi(self, muaps, output_classes, output_superimposition, firing_time, fs, signal):
-        ...
+        isi = self.calculate_interspike_interval()
+
+        stds = []
+        for i in range(self.output_motor_classes):
+            if len(isi[i]) > 0:
+                intervals = np.asarray(isi[i])
+                intervals = (intervals * 1000) / fs
+                std = np.std(intervals)
+            else:
+                std = 0
+            stds.append(std)
+            self.muap_analysis_feature_widget_child_widgets[8][2][i].setText("{0:.5f}".format(std))
+        return stds
 
     def calculate_mean_isi(self, muaps, output_classes, output_superimposition, firing_time, fs, signal):
-        ...
+        isi = self.calculate_interspike_interval()
+
+        means = []
+        for i in range(self.output_motor_classes):
+            if len(isi[i]) > 0:
+                intervals = np.asarray(isi[i])
+                intervals = (intervals * 1000) / fs
+                mean = np.mean(intervals)
+
+            else:
+                mean = 0
+            means.append(mean)
+            self.muap_analysis_feature_widget_child_widgets[9][2][i].setText("{0:.5f}".format(mean))
+        return means
 
     def calculate_freq_tlocked_muap(self, muaps, output_classes, output_superimposition, firing_time, fs, signal):
-        ...
+        freqs = []
+        for i in range(self.output_motor_classes):
+            firing_pattern = self.firing_table[i]
+            if(len(firing_pattern) > 0):
+                total = 0
+                for j in range(len(firing_pattern)):
+                    for k in range(len(self.firing_table)):
+                        if k != i and j in self.firing_table[k]:
+                            total += 1
+                freq = total/(len(signal) / fs)
+            else:
+                freq = 0
+            freqs.append(freq)
+            self.muap_analysis_feature_widget_child_widgets[10][2][i].setText("{0:.5f}".format(freq))
+        return freqs
+
     def initMUAPAnalysisOutputUI(self):
         self.muap_analysis_output_tab_layout = QHBoxLayout()
 
@@ -1097,10 +1157,10 @@ class MyTableWidget(QWidget):
                                        "Phases",
                                        "Turns(No. of +ve and -ve Peaks)",
                                        "Firing Rate",
-                                       "Mean Absolute Deviation of Inter Spike Interval(ISI)",
+                                       "Mean Absolute Deviation of Inter Spike Interval(ISI)(ms)",
                                        "Standard Deviation of ISI",
                                        "Mean of ISI",
-                                       "Frequency of Time locked MUAPs",
+                                       "Frequency of Time locked MUAPs(seconds)",
                                        ]
         self.muap_analysis_feature_type = [
             "waveform", "waveform", "waveform", "waveform", "waveform", "waveform",
