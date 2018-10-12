@@ -7,7 +7,7 @@ from PyQt5.QtCore import pyqtSlot
 from PyQt5.QtWidgets import QMenu, QSizePolicy, QMessageBox,  QCheckBox
 from PyQt5.QtWidgets import  QDialog,\
     QHBoxLayout, QLabel, QGroupBox, QSlider, \
-    QLineEdit, QScrollArea, QComboBox
+    QLineEdit, QScrollArea, QComboBox, QProgressBar
 from PyQt5.QtCore import Qt
 import os, pywt
 import numpy as np
@@ -169,6 +169,7 @@ class MyTableWidget(QWidget):
         self.tab2 = QWidget()
         self.tab3 = QWidget()
         self.tab4 = QWidget()
+        self.tab5 = QWidget()
         self.tabs.resize(300, 200)
 
         # Add tabs
@@ -176,6 +177,7 @@ class MyTableWidget(QWidget):
         self.tabs.addTab(self.tab2, "MUAP Analysis Tab")
         self.tabs.addTab(self.tab3, "MUAP Analysis Output Tab")
         self.tabs.addTab(self.tab4, "Signal Analysis Output Tab")
+        self.tabs.addTab(self.tab5, "EMG Classification Tab")
 
 
         # Create first tab
@@ -193,6 +195,10 @@ class MyTableWidget(QWidget):
         # Create fourth tab
         self.initSignalAnalysisOutputUI()
         self.tab4.setLayout(self.signal_analysis_output_tab_layout)
+
+        # Create Fifth tab
+        self.initClassificationUI()
+        self.tab5.setLayout(self.classification_tab_layout)
 
 
 
@@ -1382,7 +1388,75 @@ class MyTableWidget(QWidget):
             self.signal_analysis_output_tab_layout.addWidget(parent_widget)
             self.feature_type[ftype]["parent_widget"] = parent_widget
 
+    def start_emg_classification_thread(self):
+        ...
+    def pause_emg_classification_thread(self):
+        ...
+    def stop_emg_classification_thread(self):
+        ...
 
+    def initClassificationUI(self):
+        self.classification_tab_layout = QVBoxLayout()
+
+        self.classification_tab_control_widget = QGroupBox('Control Tab', self)
+        self.classification_tab_control_widget_layout = QHBoxLayout()
+        self.classification_tab_control_widget.setLayout(self.classification_tab_control_widget_layout)
+
+        self.classification_control_progressbar = QProgressBar(self)
+        self.classification_control_progressbar_notification = QLabel("Status: N/A", self)
+        self.classification_control_progressbar.setGeometry(200, 80, 250, 20)
+        self.classification_tab_control_widget_layout.addWidget(self.classification_control_progressbar)
+        self.classification_tab_control_widget_layout.addWidget(self.classification_control_progressbar_notification)
+
+        self.classification_control_start_btn = QPushButton("Start", self)
+        self.classification_control_start_btn.clicked.connect(self.start_emg_classification_thread)
+        self.classification_control_pause_btn = QPushButton("Pause", self)
+        self.classification_control_pause_btn.clicked.connect(self.pause_emg_classification_thread)
+        self.classification_control_stop_btn = QPushButton("Stop", self)
+        self.classification_control_stop_btn.clicked.connect(self.stop_emg_classification_thread)
+        self.classification_tab_control_widget_layout.addWidget(self.classification_control_start_btn)
+        self.classification_tab_control_widget_layout.addWidget(self.classification_control_pause_btn)
+        self.classification_tab_control_widget_layout.addWidget(self.classification_control_stop_btn)
+
+        self.classification_control_dataset_label = QLabel('Dataset URL:', self)
+        self.classification_control_dataset_url = QLineEdit(self)
+        self.classification_control_dataset_url.setText(self.data_base_dir)
+        self.classification_tab_control_widget_layout.addWidget(self.classification_control_dataset_label)
+        self.classification_tab_control_widget_layout.addWidget(self.classification_control_dataset_url)
+
+        self.classification_tab_network_widget = QGroupBox('Network Tab', self)
+        self.classification_tab_network_widget_layout = QHBoxLayout()
+        self.classification_tab_network_widget.setLayout(self.classification_tab_network_widget_layout)
+
+        self.classification_network_left_widget = QGroupBox("", self)
+        self.classification_network_left_widget_layout = QVBoxLayout()
+        self.classification_network_left_widget_layout.addWidget(QLabel("Hello", self))
+        self.classification_network_left_widget.setLayout(self.classification_network_left_widget_layout)
+        self.classification_network_right_widget = QGroupBox("", self)
+        self.classification_network_right_widget_layout = QVBoxLayout()
+        self.classification_network_right_widget_layout.addWidget(QLabel("World", self))
+        self.classification_network_right_widget.setLayout(self.classification_network_right_widget_layout)
+        self.classification_tab_network_widget_layout.addWidget(self.classification_network_left_widget)
+        self.classification_tab_network_widget_layout.addWidget(self.classification_network_right_widget)
+
+
+
+        self.classification_tab_output_scrollarea = QScrollArea(self.parent)
+        self.classification_tab_output_scrollarea.setMinimumHeight(100)
+        
+        self.classification_tab_output_scrollarea.setWidgetResizable(True)
+        self.classification_tab_output_widget = QGroupBox('Output Console', self.classification_tab_output_scrollarea)
+        self.classification_tab_output_scrollarea.setWidget(self.classification_tab_output_widget)
+        self.classification_tab_output_widget_layout = QHBoxLayout()
+        self.classification_tab_output_widget.setLayout(self.classification_tab_output_widget_layout)
+
+        self.classification_tab_output_label = QLabel("...............................")
+        self.classification_tab_output_label.setWordWrap(True)
+
+
+        self.classification_tab_layout.addWidget(self.classification_tab_control_widget)
+        self.classification_tab_layout.addWidget(self.classification_tab_network_widget)
+        self.classification_tab_layout.addWidget(self.classification_tab_output_scrollarea)
 
 
 
