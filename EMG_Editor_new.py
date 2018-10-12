@@ -854,13 +854,13 @@ class MyTableWidget(QWidget):
                     self.firing_table_section_ax[0].plot( (np.asarray(self.firing_table[i])*1000)/fs, [i+1]*len(self.firing_table[i]), 'x')
                     self.segmentation_section_ax[0].plot(self.firing_table[i], np.asarray(filtered)[self.firing_table[i]], 'o')
 
-            for i in range(len(self.firing_table)):
+            """for i in range(len(self.firing_table)):
                 if len(self.firing_table[i])> 0:
                     blanks = []
                     for j in range(len(filtered)):
                         if not (j in self.firing_table[i]):
                             blanks.append(j)
-                    self.firing_table_section_ax[0].plot((np.asarray(blanks) * 1000) / fs, [i + 1] * len(blanks), '-')
+                    self.firing_table_section_ax[0].plot((np.asarray(blanks) * 1000) / fs, [i + 1] * len(blanks), '-')"""
 
 
             self.firing_table_section_canvas.draw()

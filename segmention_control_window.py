@@ -36,9 +36,9 @@ class SegmentationControlWinow(QWidget):
         self.coeff_mav = 30
         self.coeff_thresh = 5
         self.min_peak_volt = 30
-        self.max_peak_volt = 100
+        self.max_peak_volt = 500 # Paper: 100
         self.segment_window = 6
-        self.segment_amp_rise_duration = 0.1
+        self.segment_amp_rise_duration = 1.0 # Paper: 0.1 (ms)
         self.segment_amp_rise_threshold = 40
         self.segment_threshold_calculated = 'N/A'
         self.save_preprocessed_data_file = "preprocessed_data"
