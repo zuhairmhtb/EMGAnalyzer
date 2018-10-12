@@ -1,4 +1,4 @@
-import sys, math, pdb, collections
+import sys, math, pdb, collections, _collections
 from minisom import MiniSom
 from PyQt5 import QtGui, QtCore
 from PyQt5.QtWidgets import QMainWindow, QApplication, QPushButton, QWidget, QAction, QTabWidget, QVBoxLayout
@@ -15,7 +15,7 @@ from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
-import MyNet.temp.emg_editor_pyqt.muap_analysis_functions as analysis_functions
+
 import random
 from win32api import GetSystemMetrics
 
@@ -25,6 +25,8 @@ from skimage.feature import peak_local_max
 
 from MyNet.temp.emg_editor_pyqt.segmention_control_window import SegmentationControlWinow
 from MyNet.temp.emg_editor_pyqt.classification_control_window import ClassificationControlWindow
+import MyNet.temp.emg_editor_pyqt.muap_analysis_functions as analysis_functions
+import MyNet.temp.emg_editor_pyqt.signal_analysis_functions as signal_analysis_functions
 
 class LoadingMessage(QWidget):
     def __init__(self):
@@ -166,12 +168,14 @@ class MyTableWidget(QWidget):
         self.tab1 = QWidget()
         self.tab2 = QWidget()
         self.tab3 = QWidget()
+        self.tab4 = QWidget()
         self.tabs.resize(300, 200)
 
         # Add tabs
         self.tabs.addTab(self.tab1, "PreProcessing Tab")
         self.tabs.addTab(self.tab2, "MUAP Analysis Tab")
         self.tabs.addTab(self.tab3, "MUAP Analysis Output Tab")
+        self.tabs.addTab(self.tab4, "Signal Analysis Output Tab")
 
 
         # Create first tab
@@ -185,6 +189,10 @@ class MyTableWidget(QWidget):
         # Create Third tab
         self.initMUAPAnalysisOutputUI()
         self.tab3.setLayout(self.muap_analysis_output_tab_layout)
+
+        # Create fourth tab
+        self.initSignalAnalysisOutputUI()
+        self.tab4.setLayout(self.signal_analysis_output_tab_layout)
 
 
 
@@ -716,6 +724,12 @@ class MyTableWidget(QWidget):
         filtered = self.segmentation_control_window.filter_data(cropped_data,fs)
         if self.segmentation_control_window.save_preprocessed_data_checkbox.isChecked():
             np.save(os.path.join(self.get_current_data_path(), self.segmentation_control_window.save_preprocessed_data_file), filtered)
+
+        # Update Signal Analysis Output Tab
+        for ftype in self.feature_type:
+            for i in range(len(self.feature_type[ftype]["features"])):
+                if self.feature_type[ftype]["checkboxes"][i].isChecked():
+                    self.feature_type[ftype]["functions"][i](filtered, fs, ftype, i)
         peaks = self.segmentation_control_window.detect_peaks(
             filtered, fs
         )
@@ -735,6 +749,12 @@ class MyTableWidget(QWidget):
         fs = self.read_sampling_rate(os.path.join(self.get_current_data_path(), 'data.hea'))
         cropped_data = self.segmentation_control_window.crop_input_data(self.current_data)
         filtered = self.segmentation_control_window.filter_data(cropped_data, fs)
+        # Update Signal Analysis Output Tab
+        for ftype in self.feature_type:
+            for i in range(len(self.feature_type[ftype]["features"])):
+                if self.feature_type[ftype]["checkboxes"][i].isChecked():
+                    self.feature_type[ftype]["functions"][i](filtered, fs, ftype, i)
+
         if self.segmentation_control_window.save_preprocessed_data_checkbox.isChecked():
             np.save(os.path.join(self.get_current_data_path(), self.segmentation_control_window.save_preprocessed_data_file), filtered)
         peaks = self.segmentation_control_window.detect_peaks(filtered, fs)
@@ -756,6 +776,13 @@ class MyTableWidget(QWidget):
         fs = self.read_sampling_rate(os.path.join(self.get_current_data_path(), 'data.hea'))
         cropped_data = self.segmentation_control_window.crop_input_data(self.current_data)
         filtered = self.segmentation_control_window.filter_data(cropped_data, fs)
+
+        # Update Signal Analysis Output Tab
+        for ftype in self.feature_type:
+            for i in range(len(self.feature_type[ftype]["features"])):
+                if self.feature_type[ftype]["checkboxes"][i].isChecked():
+                    self.feature_type[ftype]["functions"][i](filtered, fs, ftype, i)
+
         if self.segmentation_control_window.save_preprocessed_data_checkbox.isChecked():
             np.save(os.path.join(self.get_current_data_path(), self.segmentation_control_window.save_preprocessed_data_file), filtered)
         peaks = self.segmentation_control_window.detect_peaks(filtered, fs)
@@ -1214,6 +1241,146 @@ class MyTableWidget(QWidget):
                 self.muap_waveform_analysis_widget_layout.addWidget(self.muap_analysis_feature_scrollareas[i])
             elif self.muap_analysis_feature_type[i] == "firing_table":
                 self.firing_table_analysis_widget_layout.addWidget(self.muap_analysis_feature_scrollareas[i])
+
+    def calculate_mad(self, signal, fs, ftype, index):
+        mad = signal_analysis_functions.calculate_mav(signal)
+        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(mad))
+    def calculate_rms(self, signal, fs, ftype, index):
+        rms = signal_analysis_functions.calculate_rms(signal)
+        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(rms))
+    def calculate_sd(self, signal, fs, ftype, index):
+        sd = signal_analysis_functions.calculate_std(signal)
+        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(sd))
+    def calculate_var(self, signal, fs, ftype, index):
+        var = np.var(signal)
+        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(var))
+    def calculate_aac(self, signal, fs, ftype, index):
+        aac = signal_analysis_functions.calculate_aac(signal)
+        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(aac))
+    def calculate_smad(self, signal, fs, ftype, index):
+        smad = signal_analysis_functions.calculate_smad(signal, fs, self.segmentation_control_window.segment_window)
+        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(smad))
+    def calculate_energy(self, signal, fs, ftype, index):
+        eng = np.sum(np.square(np.abs(signal)))
+        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(eng))
+
+    def calculate_mnf(self, signal, fs, ftype, index):
+
+        sxx = np.abs(np.fft.fft(signal))
+        f = np.fft.fftfreq(len(signal), 1/fs)
+        mnf = signal_analysis_functions.calculate_mnf(sxx, f)
+        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(mnf))
+
+    def calculate_mdf(self, signal, fs, ftype, index):
+        sxx = np.abs(np.fft.fft(signal))
+        f = np.fft.fftfreq(len(signal), 1 / fs)
+        mdf = signal_analysis_functions.calculate_mdf(sxx, f)
+        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(mdf))
+
+    def calculate_amd(self, signal, fs, ftype, index):
+
+        window = self.segmentation_control_window.segment_window
+        window_len = int((fs*window)/1000)
+        f, t, sxx = spectrogram(signal, fs, nperseg=window_len, mode='psd', scaling='density')
+        amd = signal_analysis_functions.calculate_amd(sxx, t)
+        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(amd))
+
+    def calculate_vmf(self, signal, fs, ftype, index):
+        window = self.segmentation_control_window.segment_window
+        window_len = int((fs*window)/1000)
+        f, t, sxx = spectrogram(signal, fs, nperseg=window_len, mode='psd', scaling='density')
+        vmf = signal_analysis_functions.calculate_vmf(sxx, f, t)
+        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(vmf))
+
+    def calculate_mnp(self, signal, fs, ftype, index):
+        window = self.segmentation_control_window.segment_window
+        window_len = int((fs*window)/1000)
+        f, t, sxx = spectrogram(signal, fs, nperseg=window_len, mode='psd', scaling='spectrum')
+        mnp = signal_analysis_functions.calculate_mnp(sxx, t)
+        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(mnp))
+
+
+    def calculate_pkf(self, signal, fs, ftype, index):
+        window = self.segmentation_control_window.segment_window
+        window_len = int((fs*window)/1000)
+        f, t, sxx = spectrogram(signal, fs, nperseg=window_len, mode='psd', scaling='spectrum')
+        pkf = signal_analysis_functions.calculate_pkf(sxx, f, t)
+        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(pkf))
+
+    def calculate_top(self, signal, fs, ftype, index):
+        window = self.segmentation_control_window.segment_window
+        window_len = int((fs*window)/1000)
+        f, t, sxx = spectrogram(signal, fs, nperseg=window_len, mode='psd', scaling='spectrum')
+        top = np.sum(sxx.flatten())
+        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(top))
+
+
+    def calculate_vcf(self, signal, fs, ftype, index):
+        window = self.segmentation_control_window.segment_window
+        window_len = int((fs*window)/1000)
+        f, t, sxx = spectrogram(signal, fs, nperseg=window_len, mode='psd', scaling='spectrum')
+        vcf = signal_analysis_functions.calculate_vcf(sxx, f, t)
+        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(vcf))
+
+
+
+
+    def initSignalAnalysisOutputUI(self):
+        self.signal_analysis_output_tab_layout = QVBoxLayout()
+
+        # Time domain Features
+        self.feature_type = {
+            "Time Domain": {
+                "features": ["Mean Absolute Deviation", "Root Mean Square", "Standard Deviation", "Varaince",
+                                     "Average Amplitude Change", "Slope of Mean Absolute Value", "Energy"],
+                "functions": [self.calculate_mad, self.calculate_rms, self.calculate_sd, self.calculate_var,
+                              self.calculate_aac, self.calculate_smad, self.calculate_energy],
+                "checkboxes": [],
+                "labels": [],
+                "widgets": [],
+                "layouts": [],
+                "parent_widget": None,
+                "parent_layout": QHBoxLayout()
+            },
+            "Feature Domain": {
+                "features": ["Mean Frequency", "Median Frequency", "Average Maximum Density",
+                             "Variance of Maximum Frequency", "Mean Power", "Peak Frequency",
+                             "Total Power", "Variance of Central Frequency",
+                             ],
+                "functions": [self.calculate_mnf, self.calculate_mdf, self.calculate_amd,
+                              self.calculate_vmf, self.calculate_mnp, self.calculate_pkf,
+                              self.calculate_top, self.calculate_vcf],
+                "checkboxes": [],
+                "labels": [],
+                "widgets": [],
+                "layouts": [],
+                "parent_widget": None,
+                "parent_layout": QHBoxLayout()
+            }
+        }
+
+        # Create View for each feature type
+        for ftype in self.feature_type:
+            parent_widget = QGroupBox(ftype.upper() + " ANALYSIS", self)
+            parent_widget.setLayout(self.feature_type[ftype]["parent_layout"])
+
+            for j in range(len(self.feature_type[ftype]["features"])):
+                widget = QGroupBox(self.feature_type[ftype]["features"][j], self)
+                layout = QHBoxLayout()
+                widget.setLayout(layout)
+                checkbox = QCheckBox("Calculate", self)
+                checkbox.setChecked(True)
+                label = QLabel("N/A", self)
+                layout.addWidget(checkbox)
+                layout.addWidget(label)
+                self.feature_type[ftype]["parent_layout"].addWidget(widget)
+                self.feature_type[ftype]["widgets"].append(widget)
+                self.feature_type[ftype]["layouts"].append(layout)
+                self.feature_type[ftype]["checkboxes"].append(checkbox)
+                self.feature_type[ftype]["labels"].append(label)
+
+            self.signal_analysis_output_tab_layout.addWidget(parent_widget)
+            self.feature_type[ftype]["parent_widget"] = parent_widget
 
 
 
