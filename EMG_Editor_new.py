@@ -27,6 +27,7 @@ from MyNet.temp.emg_editor_pyqt.segmention_control_window import SegmentationCon
 from MyNet.temp.emg_editor_pyqt.classification_control_window import ClassificationControlWindow
 import MyNet.temp.emg_editor_pyqt.muap_analysis_functions as analysis_functions
 import MyNet.temp.emg_editor_pyqt.signal_analysis_functions as signal_analysis_functions
+from MyNet.temp.emg_editor_pyqt.network_widgets import ClassifierWidget, KNearestClassifier, SVMCLassifier
 
 class LoadingMessage(QWidget):
     def __init__(self):
@@ -1425,25 +1426,32 @@ class MyTableWidget(QWidget):
         self.classification_tab_control_widget_layout.addWidget(self.classification_control_dataset_url)
 
         self.classification_tab_network_widget = QGroupBox('Network Tab', self)
-        self.classification_tab_network_widget_layout = QHBoxLayout()
+        self.classification_tab_network_widget_layout = QVBoxLayout()
         self.classification_tab_network_widget.setLayout(self.classification_tab_network_widget_layout)
+        self.classifiers = {
+            'K Nearest Neighbor': KNearestClassifier('K Nearest Neigbors', 1, self),
+            'Support Vector Machine': SVMCLassifier('Support Vector Machine', 2, self),
+            'Random Forest': KNearestClassifier('Random Forest', 3, self)
+        }
+        widget_group = None
+        layout_group = None
+        classifier_number = 0
+        for k in sorted(self.classifiers):
+            classifier_scrollview = self.classifiers[k].view
+            if classifier_number % 2 == 0:
+                widget_group = QGroupBox("", self)
+                layout_group = QHBoxLayout()
+                widget_group.setLayout(layout_group)
+                self.classification_tab_network_widget_layout.addWidget(widget_group)
+            layout_group.addWidget(classifier_scrollview.main_scroller)
+            classifier_number += 1
 
-        self.classification_network_left_widget = QGroupBox("", self)
-        self.classification_network_left_widget_layout = QVBoxLayout()
-        self.classification_network_left_widget_layout.addWidget(QLabel("Hello", self))
-        self.classification_network_left_widget.setLayout(self.classification_network_left_widget_layout)
-        self.classification_network_right_widget = QGroupBox("", self)
-        self.classification_network_right_widget_layout = QVBoxLayout()
-        self.classification_network_right_widget_layout.addWidget(QLabel("World", self))
-        self.classification_network_right_widget.setLayout(self.classification_network_right_widget_layout)
-        self.classification_tab_network_widget_layout.addWidget(self.classification_network_left_widget)
-        self.classification_tab_network_widget_layout.addWidget(self.classification_network_right_widget)
 
 
 
         self.classification_tab_output_scrollarea = QScrollArea(self.parent)
         self.classification_tab_output_scrollarea.setMinimumHeight(100)
-        
+
         self.classification_tab_output_scrollarea.setWidgetResizable(True)
         self.classification_tab_output_widget = QGroupBox('Output Console', self.classification_tab_output_scrollarea)
         self.classification_tab_output_scrollarea.setWidget(self.classification_tab_output_widget)
