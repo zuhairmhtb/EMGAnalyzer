@@ -27,7 +27,8 @@ from MyNet.temp.emg_editor_pyqt.segmention_control_window import SegmentationCon
 from MyNet.temp.emg_editor_pyqt.classification_control_window import ClassificationControlWindow
 import MyNet.temp.emg_editor_pyqt.muap_analysis_functions as analysis_functions
 import MyNet.temp.emg_editor_pyqt.signal_analysis_functions as signal_analysis_functions
-from MyNet.temp.emg_editor_pyqt.network_widgets import ClassifierWidget, KNearestClassifier, SVMCLassifier
+from MyNet.temp.emg_editor_pyqt.network_widgets import ClassifierWidget, KNearestClassifier, SVMCLassifier, RForestCLassifier
+from MyNet.temp.emg_editor_pyqt.classification_handler import ClassificationHandlerThread
 
 class LoadingMessage(QWidget):
     def __init__(self):
@@ -72,7 +73,7 @@ class App(QMainWindow):
 
 
 class MyTableWidget(QWidget):
-
+    update_training_view_signal = QtCore.pyqtSignal()
     def __init__(self, parent):
         super(QWidget, self).__init__(parent)
 
@@ -87,9 +88,12 @@ class MyTableWidget(QWidget):
             'brown', 'purple', 'orange', 'magenta', 'yellow', 'black', 'red', 'aqua', 'grey', 'olive',
             'wheat', 'cyan'
         ]
-
+        self.classification_handler = None
+        self.classified_accuracies = []
+        self.classified_loss = []
         self.debug_mode = False
         self.data = self.get_dataset()
+
         self.preprocess_tab_fig = plt.figure(1)
         self.preprocess_tab_ax = []
         self.preprocess_tab_ax.append(self.preprocess_tab_fig.add_subplot(1, 1, 1))
@@ -986,7 +990,7 @@ class MyTableWidget(QWidget):
         #self.classification_section_widget_layout.addWidget(QLabel("Hello", self))
         self.muap_an_tab_layout.addWidget(self.classification_section_widget)
 
-    def calculate_amp_difference(self, muaps, output_classes, output_superimposition, firing_time, fs, signal):
+    def calculate_amp_difference(self, muaps, output_classes, output_superimposition, firing_time, fs, signal, show_in_tab=True):
         peaks_thresh = -1
         window = self.segmentation_control_window.segment_window
         muaps = np.asarray(muaps)
@@ -998,12 +1002,16 @@ class MyTableWidget(QWidget):
 
         amp_difference = analysis_functions.calculate_amplitude_difference(actual_muaps, peaks_thresh)
         outputs = ["" for _ in range(self.output_motor_classes)]
+        outputs_val = [ [] for _ in range(self.output_motor_classes)]
         for i in range(len(actual_muaps)):
             outputs[actual_output_classes[i]] = outputs[actual_output_classes[i]] + "{0:.5f}".format(amp_difference[i]) + "\n"
-        for i in range(len(outputs)):
-            self.muap_analysis_feature_widget_child_widgets[0][2][i].setText(outputs[i])
+            outputs_val[actual_output_classes[i]].append(amp_difference[i])
+        if show_in_tab:
+            for i in range(len(outputs)):
+                self.muap_analysis_feature_widget_child_widgets[0][2][i].setText(outputs[i])
+        return outputs_val
 
-    def calculate_duration(self, muaps, output_classes, output_superimposition, firing_time, fs, signal):
+    def calculate_duration(self, muaps, output_classes, output_superimposition, firing_time, fs, signal, show_in_tab=True):
         peaks_thresh = -1
         window = self.segmentation_control_window.segment_window
         muaps = np.asarray(muaps)
@@ -1015,12 +1023,15 @@ class MyTableWidget(QWidget):
 
         durations, end_points = analysis_functions.calculate_waveform_duration(actual_muaps, window)
         outputs = ["" for _ in range(self.output_motor_classes)]
+        outputs_val = [[] for _ in range(self.output_motor_classes)]
         for i in range(len(actual_muaps)):
             outputs[actual_output_classes[i]] = outputs[actual_output_classes[i]] + "{0:.5f}".format(durations[i]) + "\n"
-        for i in range(len(outputs)):
-            self.muap_analysis_feature_widget_child_widgets[1][2][i].setText(outputs[i])
-
-    def calculate_rect_area(self, muaps, output_classes, output_superimposition, firing_time, fs, signal):
+            outputs_val[actual_output_classes[i]].append(durations[i])
+        if show_in_tab:
+            for i in range(len(outputs)):
+                self.muap_analysis_feature_widget_child_widgets[1][2][i].setText(outputs[i])
+        return outputs_val
+    def calculate_rect_area(self, muaps, output_classes, output_superimposition, firing_time, fs, signal, show_in_tab=True):
         peaks_thresh = -1
         window = self.segmentation_control_window.segment_window
         muaps = np.asarray(muaps)
@@ -1032,12 +1043,15 @@ class MyTableWidget(QWidget):
 
         rect_area = analysis_functions.calculate_rectified_waveform_area(actual_muaps, window)
         outputs = ["" for _ in range(self.output_motor_classes)]
+        outputs_val = [[] for _ in range(self.output_motor_classes)]
         for i in range(len(actual_muaps)):
             outputs[actual_output_classes[i]] = outputs[actual_output_classes[i]] + "{0:.5f}".format(rect_area[i]) + "\n"
-        for i in range(len(outputs)):
-            self.muap_analysis_feature_widget_child_widgets[2][2][i].setText(outputs[i])
-
-    def calculate_rise_time(self, muaps, output_classes, output_superimposition, firing_time, fs, signal):
+            outputs_val[actual_output_classes[i]].append(rect_area[i])
+        if show_in_tab:
+            for i in range(len(outputs)):
+                self.muap_analysis_feature_widget_child_widgets[2][2][i].setText(outputs[i])
+        return outputs_val
+    def calculate_rise_time(self, muaps, output_classes, output_superimposition, firing_time, fs, signal, show_in_tab=True):
         peaks_thresh = -1
         window = self.segmentation_control_window.segment_window
         muaps = np.asarray(muaps)
@@ -1049,12 +1063,16 @@ class MyTableWidget(QWidget):
 
         rise_time = analysis_functions.calculate_rise_time(actual_muaps, window, peaks_thresh)
         outputs = ["" for _ in range(self.output_motor_classes)]
+        outputs_val = [[] for _ in range(self.output_motor_classes)]
         for i in range(len(actual_muaps)):
             outputs[actual_output_classes[i]] = outputs[actual_output_classes[i]] + "{0:.5f}".format(rise_time[i]) + "\n"
-        for i in range(len(outputs)):
-            self.muap_analysis_feature_widget_child_widgets[3][2][i].setText(outputs[i])
+            outputs_val[actual_output_classes[i]].append(rise_time[i])
+        if show_in_tab:
+            for i in range(len(outputs)):
+                self.muap_analysis_feature_widget_child_widgets[3][2][i].setText(outputs[i])
+        return outputs_val
 
-    def calculate_phases(self, muaps, output_classes, output_superimposition, firing_time, fs, signal):
+    def calculate_phases(self, muaps, output_classes, output_superimposition, firing_time, fs, signal, show_in_tab=True):
         peaks_thresh = -1
         window = self.segmentation_control_window.segment_window
         muaps = np.asarray(muaps)
@@ -1066,12 +1084,16 @@ class MyTableWidget(QWidget):
 
         phases = analysis_functions.calculate_phase(actual_muaps, window)
         outputs = ["" for _ in range(self.output_motor_classes)]
+        outputs_val = [[] for _ in range(self.output_motor_classes)]
         for i in range(len(actual_muaps)):
             outputs[actual_output_classes[i]] = outputs[actual_output_classes[i]] + "{0:.5f}".format(phases[i]) + "\n"
-        for i in range(len(outputs)):
-            self.muap_analysis_feature_widget_child_widgets[4][2][i].setText(outputs[i])
+            outputs_val[actual_output_classes[i]].append(phases[i])
+        if show_in_tab:
+            for i in range(len(outputs)):
+                self.muap_analysis_feature_widget_child_widgets[4][2][i].setText(outputs[i])
+        return outputs_val
 
-    def calculate_turns(self, muaps, output_classes, output_superimposition, firing_time, fs, signal):
+    def calculate_turns(self, muaps, output_classes, output_superimposition, firing_time, fs, signal, show_in_tab=True):
         peaks_thresh = -1
         window = self.segmentation_control_window.segment_window
         muaps = np.asarray(muaps)
@@ -1083,12 +1105,16 @@ class MyTableWidget(QWidget):
 
         turns = analysis_functions.calculate_turns(actual_muaps, window, peaks_thresh)
         outputs = ["" for _ in range(self.output_motor_classes)]
+        outputs_val = [[] for _ in range(self.output_motor_classes)]
         for i in range(len(actual_muaps)):
             outputs[actual_output_classes[i]] = outputs[actual_output_classes[i]] + "{0:.5f}".format(turns[i]) + "\n"
-        for i in range(len(outputs)):
-            self.muap_analysis_feature_widget_child_widgets[5][2][i].setText(outputs[i])
+            outputs_val[actual_output_classes[i]].append(turns[i])
+        if show_in_tab:
+            for i in range(len(outputs)):
+                self.muap_analysis_feature_widget_child_widgets[5][2][i].setText(outputs[i])
+        return outputs_val
 
-    def calculate_firing_rate(self, muaps, output_classes, output_superimposition, firing_time, fs, signal):
+    def calculate_firing_rate(self, muaps, output_classes, output_superimposition, firing_time, fs, signal, show_in_tab=True):
         total_duration = len(signal) / fs
         firing_rates = []
         for i in range(self.output_motor_classes):
@@ -1096,7 +1122,9 @@ class MyTableWidget(QWidget):
             total = len(firing_pattern)
             firing_rate = total / total_duration
             firing_rates.append(firing_rate)
-            self.muap_analysis_feature_widget_child_widgets[6][2][i].setText("{0:.5f}".format(firing_rate))
+            if show_in_tab:
+                self.muap_analysis_feature_widget_child_widgets[6][2][i].setText("{0:.5f}".format(firing_rate))
+        return firing_rates
     def calculate_interspike_interval(self):
         interspike_intervals = []
         for i in range(self.output_motor_classes):
@@ -1104,7 +1132,7 @@ class MyTableWidget(QWidget):
             interspike_intervals.append([self.firing_table[i][j+1] - self.firing_table[i][j] for j in range(len(self.firing_table[i])-1)])
         return interspike_intervals
 
-    def calculate_mad_isi(self, muaps, output_classes, output_superimposition, firing_time, fs, signal):
+    def calculate_mad_isi(self, muaps, output_classes, output_superimposition, firing_time, fs, signal, show_in_tab=True):
 
         isi = self.calculate_interspike_interval()
 
@@ -1119,11 +1147,11 @@ class MyTableWidget(QWidget):
             else:
                 mad = 0
             mads.append(mad)
-
-            self.muap_analysis_feature_widget_child_widgets[7][2][i].setText("{0:.5f}".format(mad))
+            if show_in_tab:
+                self.muap_analysis_feature_widget_child_widgets[7][2][i].setText("{0:.5f}".format(mad))
         return mads
 
-    def calculate_std_isi(self, muaps, output_classes, output_superimposition, firing_time, fs, signal):
+    def calculate_std_isi(self, muaps, output_classes, output_superimposition, firing_time, fs, signal, show_in_tab=True):
         isi = self.calculate_interspike_interval()
 
         stds = []
@@ -1135,10 +1163,11 @@ class MyTableWidget(QWidget):
             else:
                 std = 0
             stds.append(std)
-            self.muap_analysis_feature_widget_child_widgets[8][2][i].setText("{0:.5f}".format(std))
+            if show_in_tab:
+                self.muap_analysis_feature_widget_child_widgets[8][2][i].setText("{0:.5f}".format(std))
         return stds
 
-    def calculate_mean_isi(self, muaps, output_classes, output_superimposition, firing_time, fs, signal):
+    def calculate_mean_isi(self, muaps, output_classes, output_superimposition, firing_time, fs, signal, show_in_tab=True):
         isi = self.calculate_interspike_interval()
 
         means = []
@@ -1151,10 +1180,11 @@ class MyTableWidget(QWidget):
             else:
                 mean = 0
             means.append(mean)
-            self.muap_analysis_feature_widget_child_widgets[9][2][i].setText("{0:.5f}".format(mean))
+            if show_in_tab:
+                self.muap_analysis_feature_widget_child_widgets[9][2][i].setText("{0:.5f}".format(mean))
         return means
 
-    def calculate_freq_tlocked_muap(self, muaps, output_classes, output_superimposition, firing_time, fs, signal):
+    def calculate_freq_tlocked_muap(self, muaps, output_classes, output_superimposition, firing_time, fs, signal, show_in_tab=True):
         freqs = []
         for i in range(self.output_motor_classes):
             firing_pattern = self.firing_table[i]
@@ -1168,7 +1198,8 @@ class MyTableWidget(QWidget):
             else:
                 freq = 0
             freqs.append(freq)
-            self.muap_analysis_feature_widget_child_widgets[10][2][i].setText("{0:.5f}".format(freq))
+            if show_in_tab:
+                self.muap_analysis_feature_widget_child_widgets[10][2][i].setText("{0:.5f}".format(freq))
         return freqs
 
     def initMUAPAnalysisOutputUI(self):
@@ -1228,7 +1259,8 @@ class MyTableWidget(QWidget):
                 [
                     QLabel("N/A", self) for _ in range(self.output_motor_classes)
                 ],
-                QCheckBox("Calculate Parameters", self)
+                QCheckBox("Calculate Parameters", self),
+                QCheckBox("Classifier", self)
 
             ] for _ in range(len(self.muap_analysis_features))
         ]
@@ -1238,96 +1270,127 @@ class MyTableWidget(QWidget):
             self.muap_analysis_feature_scrollareas[i].setWidget(self.muap_analysis_feature_widgets[i])
             self.muap_analysis_feature_widgets[i].setLayout(self.muap_analysis_feature_widget_layouts[i])
             self.muap_analysis_feature_widget_child_widgets[i][3].setChecked(True)
+            self.muap_analysis_feature_widget_child_widgets[i][4].setChecked(True)
             for j in range(self.output_motor_classes):
                 self.muap_analysis_feature_widget_child_widgets[i][2][j].setWordWrap(True)
                 self.muap_analysis_feature_widget_child_widgets[i][0][j].setLayout(self.muap_analysis_feature_widget_child_widgets[i][1][j])
                 self.muap_analysis_feature_widget_child_widgets[i][1][j].addWidget(self.muap_analysis_feature_widget_child_widgets[i][2][j])
                 self.muap_analysis_feature_widget_layouts[i].addWidget(self.muap_analysis_feature_widget_child_widgets[i][0][j])
             self.muap_analysis_feature_widget_layouts[i].addWidget(self.muap_analysis_feature_widget_child_widgets[i][3])
+            self.muap_analysis_feature_widget_layouts[i].addWidget(
+                self.muap_analysis_feature_widget_child_widgets[i][4])
             if self.muap_analysis_feature_type[i] == "waveform":
                 self.muap_waveform_analysis_widget_layout.addWidget(self.muap_analysis_feature_scrollareas[i])
             elif self.muap_analysis_feature_type[i] == "firing_table":
                 self.firing_table_analysis_widget_layout.addWidget(self.muap_analysis_feature_scrollareas[i])
 
-    def calculate_mad(self, signal, fs, ftype, index):
+    def calculate_mad(self, signal, fs, ftype, index, show_in_tab=True):
         mad = signal_analysis_functions.calculate_mav(signal)
-        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(mad))
-    def calculate_rms(self, signal, fs, ftype, index):
+        if show_in_tab:
+            self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(mad))
+        return mad
+    def calculate_rms(self, signal, fs, ftype, index, show_in_tab=True):
         rms = signal_analysis_functions.calculate_rms(signal)
         self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(rms))
-    def calculate_sd(self, signal, fs, ftype, index):
+    def calculate_sd(self, signal, fs, ftype, index, show_in_tab=True):
         sd = signal_analysis_functions.calculate_std(signal)
-        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(sd))
-    def calculate_var(self, signal, fs, ftype, index):
+        if show_in_tab:
+            self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(sd))
+        return sd
+    def calculate_var(self, signal, fs, ftype, index, show_in_tab=True):
         var = np.var(signal)
-        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(var))
-    def calculate_aac(self, signal, fs, ftype, index):
+        if show_in_tab:
+            self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(var))
+        return var
+    def calculate_aac(self, signal, fs, ftype, index, show_in_tab=True):
         aac = signal_analysis_functions.calculate_aac(signal)
-        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(aac))
-    def calculate_smad(self, signal, fs, ftype, index):
+        if show_in_tab:
+            self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(aac))
+        return aac
+    def calculate_smad(self, signal, fs, ftype, index, show_in_tab=True):
         smad = signal_analysis_functions.calculate_smad(signal, fs, self.segmentation_control_window.segment_window)
-        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(smad))
-    def calculate_energy(self, signal, fs, ftype, index):
+        if show_in_tab:
+            self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(smad))
+        return smad
+    def calculate_energy(self, signal, fs, ftype, index, show_in_tab=True):
         eng = np.sum(np.square(np.abs(signal)))
-        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(eng))
+        if show_in_tab:
+            self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(eng))
+        return eng
 
-    def calculate_mnf(self, signal, fs, ftype, index):
+    def calculate_mnf(self, signal, fs, ftype, index, show_in_tab=True):
 
         sxx = np.abs(np.fft.fft(signal))
         f = np.fft.fftfreq(len(signal), 1/fs)
         mnf = signal_analysis_functions.calculate_mnf(sxx, f)
-        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(mnf))
+        if show_in_tab:
+            self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(mnf))
+        return mnf
 
-    def calculate_mdf(self, signal, fs, ftype, index):
+    def calculate_mdf(self, signal, fs, ftype, index, show_in_tab=True):
         sxx = np.abs(np.fft.fft(signal))
         f = np.fft.fftfreq(len(signal), 1 / fs)
         mdf = signal_analysis_functions.calculate_mdf(sxx, f)
-        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(mdf))
+        if show_in_tab:
+            self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(mdf))
+        return mdf
 
-    def calculate_amd(self, signal, fs, ftype, index):
+    def calculate_amd(self, signal, fs, ftype, index, show_in_tab=True):
 
         window = self.segmentation_control_window.segment_window
         window_len = int((fs*window)/1000)
         f, t, sxx = spectrogram(signal, fs, nperseg=window_len, mode='psd', scaling='density')
         amd = signal_analysis_functions.calculate_amd(sxx, t)
-        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(amd))
+        if show_in_tab:
+            self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(amd))
+        return amd
 
-    def calculate_vmf(self, signal, fs, ftype, index):
+    def calculate_vmf(self, signal, fs, ftype, index, show_in_tab=True):
         window = self.segmentation_control_window.segment_window
         window_len = int((fs*window)/1000)
         f, t, sxx = spectrogram(signal, fs, nperseg=window_len, mode='psd', scaling='density')
         vmf = signal_analysis_functions.calculate_vmf(sxx, f, t)
-        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(vmf))
+        if show_in_tab:
+            self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(vmf))
+        return vmf
 
-    def calculate_mnp(self, signal, fs, ftype, index):
+    def calculate_mnp(self, signal, fs, ftype, index, show_in_tab=True):
         window = self.segmentation_control_window.segment_window
         window_len = int((fs*window)/1000)
         f, t, sxx = spectrogram(signal, fs, nperseg=window_len, mode='psd', scaling='spectrum')
         mnp = signal_analysis_functions.calculate_mnp(sxx, t)
-        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(mnp))
+        if show_in_tab:
+            self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(mnp))
+        return mnp
 
 
-    def calculate_pkf(self, signal, fs, ftype, index):
+    def calculate_pkf(self, signal, fs, ftype, index, show_in_tab=True):
         window = self.segmentation_control_window.segment_window
         window_len = int((fs*window)/1000)
         f, t, sxx = spectrogram(signal, fs, nperseg=window_len, mode='psd', scaling='spectrum')
         pkf = signal_analysis_functions.calculate_pkf(sxx, f, t)
-        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(pkf))
+        if show_in_tab:
+            self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(pkf))
+        return pkf
 
-    def calculate_top(self, signal, fs, ftype, index):
+    def calculate_top(self, signal, fs, ftype, index, show_in_tab=True):
         window = self.segmentation_control_window.segment_window
         window_len = int((fs*window)/1000)
         f, t, sxx = spectrogram(signal, fs, nperseg=window_len, mode='psd', scaling='spectrum')
         top = np.sum(sxx.flatten())
-        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(top))
+        if show_in_tab:
+            self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(top))
+        return top
 
 
-    def calculate_vcf(self, signal, fs, ftype, index):
+    def calculate_vcf(self, signal, fs, ftype, index, show_in_tab=True):
         window = self.segmentation_control_window.segment_window
         window_len = int((fs*window)/1000)
         f, t, sxx = spectrogram(signal, fs, nperseg=window_len, mode='psd', scaling='spectrum')
         vcf = signal_analysis_functions.calculate_vcf(sxx, f, t)
-        self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(vcf))
+        if show_in_tab:
+            self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(vcf))
+        return vcf
 
 
 
@@ -1343,6 +1406,7 @@ class MyTableWidget(QWidget):
                 "functions": [self.calculate_mad, self.calculate_rms, self.calculate_sd, self.calculate_var,
                               self.calculate_aac, self.calculate_smad, self.calculate_energy],
                 "checkboxes": [],
+                "classification_checkboxes": [],
                 "labels": [],
                 "widgets": [],
                 "layouts": [],
@@ -1358,6 +1422,7 @@ class MyTableWidget(QWidget):
                               self.calculate_vmf, self.calculate_mnp, self.calculate_pkf,
                               self.calculate_top, self.calculate_vcf],
                 "checkboxes": [],
+                "classification_checkboxes": [],
                 "labels": [],
                 "widgets": [],
                 "layouts": [],
@@ -1377,24 +1442,92 @@ class MyTableWidget(QWidget):
                 widget.setLayout(layout)
                 checkbox = QCheckBox("Calculate", self)
                 checkbox.setChecked(True)
+                classification_checkbox = QCheckBox('Classifier', self)
+                classification_checkbox.setChecked(True)
                 label = QLabel("N/A", self)
                 layout.addWidget(checkbox)
                 layout.addWidget(label)
+                layout.addWidget(classification_checkbox)
                 self.feature_type[ftype]["parent_layout"].addWidget(widget)
                 self.feature_type[ftype]["widgets"].append(widget)
                 self.feature_type[ftype]["layouts"].append(layout)
                 self.feature_type[ftype]["checkboxes"].append(checkbox)
                 self.feature_type[ftype]["labels"].append(label)
+                self.feature_type[ftype]["classification_checkboxes"].append(classification_checkbox)
 
             self.signal_analysis_output_tab_layout.addWidget(parent_widget)
             self.feature_type[ftype]["parent_widget"] = parent_widget
 
+
     def start_emg_classification_thread(self):
-        ...
+
+        if not (self.classification_handler is None):
+            if self.classification_handler.current_classification_mode == self.classification_handler.classification_mode['Paused']:
+                self.classification_handler.current_classification_mode = self.classification_handler.classification_mode['Start']
+
+            elif self.classification_handler.current_classification_mode == self.classification_handler.classification_mode['Stop']:
+                self.classification_handler = ClassificationHandlerThread(str(self.classification_control_dataset_url.text()),
+                                                                          self.update_training_view_signal, self)
+                self.classification_handler.update_training_view_signal.connect(self.update_training_view)
+                self.classified_accuracies = [ [] for _ in range(len(self.classifiers))]
+                self.classified_loss = [[] for _ in range(len(self.classifiers))]
+                for clf in self.classifiers:
+                    self.classifiers[clf].create_classifier()
+                self.classification_handler.start()
+        else:
+            self.classification_handler = ClassificationHandlerThread(str(self.classification_control_dataset_url.text()),
+                                                                      self.update_training_view_signal, self)
+            self.classification_handler.update_training_view_signal.connect(self.update_training_view)
+            self.classified_accuracies = [[] for _ in range(len(self.classifiers))]
+            self.classified_loss = [[] for _ in range(len(self.classifiers))]
+            for clf in self.classifiers:
+                self.classifiers[clf].create_classifier()
+            self.classification_handler.start()
+
     def pause_emg_classification_thread(self):
-        ...
+        if not (self.classification_handler is None) and self.classification_handler.current_classification_mode == self.classification_handler.classification_mode['Start']:
+            self.classification_handler.current_classification_mode = self.classification_handler.classification_mode['Paused']
+
     def stop_emg_classification_thread(self):
-        ...
+        if not (self.classification_handler is None):
+            if self.classification_handler.current_classification_mode != self.classification_handler.classification_mode['Stop']:
+                self.classification_handler.current_classification_mode = self.classification_handler.classification_mode['Stop']
+
+
+    def update_training_view(self):
+        features = self.classification_handler.current_data
+        features_np = np.asarray(features)
+        labels = self.classification_handler.current_labels
+        labels_np = np.asarray(labels)
+        if(len(features) > 5):
+            accuracies = []
+            losses = []
+            c = 0
+            for k in self.classifiers:
+
+                accuracy, loss = self.classifiers[k].train_classifier(features, labels)
+                self.classified_accuracies[c].append(accuracy)
+                self.classified_loss[c].append(loss)
+
+                self.classifiers[k].view.info_type["training"]["children"]["accuracy"]["value"].setText("{0:.3f}".format(accuracy*100))
+                self.classifiers[k].view.info_type["training"]["children"]["loss"]["value"].setText(
+                    "{0:.3f}".format(loss * 100))
+                self.classifiers[k].view.graphs['accuracy']['axis'].clear()
+                self.classifiers[k].view.graphs['accuracy']["axis"].plot(self.classified_accuracies[c])
+                self.classifiers[k].view.graphs['accuracy']["canvas"].draw()
+                self.classifiers[k].view.graphs['loss']['axis'].clear()
+                self.classifiers[k].view.graphs['loss']["axis"].plot(self.classified_loss[c])
+                self.classifiers[k].view.graphs['loss']["canvas"].draw()
+                self.classifiers[k].view.graphs['data']['axis'].clear()
+                self.classifiers[k].view.graphs['data']['axis'].scatter(features_np[:, 0], features_np[:, 1])
+                self.classifiers[k].view.graphs['data']["canvas"].draw()
+                c += 1
+
+        if not (self.classification_handler is None):
+            self.classification_control_progressbar.setValue(
+                int(len(self.classification_handler.current_data)*100/len(self.classification_handler.dataset))
+            )
+
 
     def initClassificationUI(self):
         self.classification_tab_layout = QVBoxLayout()
@@ -1404,6 +1537,8 @@ class MyTableWidget(QWidget):
         self.classification_tab_control_widget.setLayout(self.classification_tab_control_widget_layout)
 
         self.classification_control_progressbar = QProgressBar(self)
+        self.classification_control_progressbar.setMinimum(0)
+        self.classification_control_progressbar.setMaximum(100)
         self.classification_control_progressbar_notification = QLabel("Status: N/A", self)
         self.classification_control_progressbar.setGeometry(200, 80, 250, 20)
         self.classification_tab_control_widget_layout.addWidget(self.classification_control_progressbar)
@@ -1422,6 +1557,7 @@ class MyTableWidget(QWidget):
         self.classification_control_dataset_label = QLabel('Dataset URL:', self)
         self.classification_control_dataset_url = QLineEdit(self)
         self.classification_control_dataset_url.setText(self.data_base_dir)
+        self.classification_control_dataset_url.setText(self.data_base_dir)
         self.classification_tab_control_widget_layout.addWidget(self.classification_control_dataset_label)
         self.classification_tab_control_widget_layout.addWidget(self.classification_control_dataset_url)
 
@@ -1431,8 +1567,10 @@ class MyTableWidget(QWidget):
         self.classifiers = {
             'K Nearest Neighbor': KNearestClassifier('K Nearest Neigbors', 1, self),
             'Support Vector Machine': SVMCLassifier('Support Vector Machine', 2, self),
-            'Random Forest': KNearestClassifier('Random Forest', 3, self)
+            'Random Forest': RForestCLassifier('Random Forest', 3, self)
         }
+        self.classified_accuracies = [[] for _ in range(len(self.classifiers))]
+        self.classified_loss = [[] for _ in range(len(self.classifiers))]
         widget_group = None
         layout_group = None
         classifier_number = 0
@@ -1465,6 +1603,8 @@ class MyTableWidget(QWidget):
         self.classification_tab_layout.addWidget(self.classification_tab_control_widget)
         self.classification_tab_layout.addWidget(self.classification_tab_network_widget)
         self.classification_tab_layout.addWidget(self.classification_tab_output_scrollarea)
+
+
 
 
 

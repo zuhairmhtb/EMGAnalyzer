@@ -270,12 +270,19 @@ class KNearestClassifier(Classifier):
         alg = str(self.algorithm_input.currentText())
         lsize = int(self.leaf_size_inp.text())
         pparam = int(self.power_param_inp.text())
-        self.classifier_object = KNeighborsClassifier(n_neighbors=neighb, algorithm=alg, leaf_size=lsize, p=pparam)
+        self.classifier_object = KNeighborsClassifier(n_neighbors=neighb, algorithm=self.algorithms[alg], leaf_size=lsize, p=pparam)
 
     def train_classifier(self, X, y, shuffle=True):
+
         total_data_len = len(self.input_dataset)
-        train_size = int(self.view.info_type['training']['children']['train_data_size']['value'].text())
-        test_size = int(self.view.info_type['training']['children']['test_data_size']['value'].text())
+        if len(str(self.view.info_type['training']['children']['train_data_size']['value'].text())) > 0:
+            train_size = int(self.view.info_type['training']['children']['train_data_size']['value'].text())
+        else:
+            train_size = 5
+        if len(str(self.view.info_type['training']['children']['test_data_size']['value'].text())) > 0:
+            test_size = int(self.view.info_type['training']['children']['test_data_size']['value'].text())
+        else:
+            test_size = 1
         test_perc = test_size/(test_size+train_size)
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = test_perc, random_state = 42, shuffle=shuffle)
         self.classifier_object.fit(X_train, y_train)
@@ -369,9 +376,16 @@ class SVMCLassifier(Classifier):
                                      decision_function_shape=dec_fn)
 
     def train_classifier(self, X, y, shuffle=True):
+
         total_data_len = len(self.input_dataset)
-        train_size = int(self.view.info_type['training']['children']['train_data_size']['value'].text())
-        test_size = int(self.view.info_type['training']['children']['test_data_size']['value'].text())
+        if len(str(self.view.info_type['training']['children']['train_data_size']['value'].text())) > 0:
+            train_size = int(self.view.info_type['training']['children']['train_data_size']['value'].text())
+        else:
+            train_size = 5
+        if len(str(self.view.info_type['training']['children']['test_data_size']['value'].text())) > 0:
+            test_size = int(self.view.info_type['training']['children']['test_data_size']['value'].text())
+        else:
+            test_size = 1
         test_perc = test_size / (test_size + train_size)
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_perc, random_state=42, shuffle=shuffle)
         self.classifier_object.fit(X_train, y_train)
@@ -389,4 +403,97 @@ class SVMCLassifier(Classifier):
             output_confidence.append(prediction[i][index])
         return output_class, output_confidence
 
+class RForestCLassifier(Classifier):
+    def __init__(self, classifier_name, classifier_number, view_parent):
+        self.classifier_object = RandomForestClassifier(n_estimators=10, max_depth=None, min_samples_split=2,
+                                                        max_features='auto', warm_start=False)
+        self.trees_input = QLineEdit(view_parent)
+        self.trees_input.setText('10')
+        self.max_depth_input = QLineEdit(view_parent)
+        self.max_depth_input.setText('None')
+        self.sample_split_input = QLineEdit(view_parent)
+        self.sample_split_input.setText('2')
+        self.max_features_input = QLineEdit(view_parent)
+        self.max_features_input.setText('auto')
+        self.warm_start_input = QComboBox(view_parent)
+        self.warm_start_input.addItem('True')
+        self.warm_start_input.addItem('False')
 
+        self.input_dataset = []
+        self.network_widgets = {
+            'trees': {
+                'value': self.trees_input,
+                'label': QLabel('No. of Trees: ', view_parent),
+                'widget': QGroupBox('', view_parent),
+                'layout': QHBoxLayout()
+            },
+            'max_depth': {
+                'value': self.max_depth_input,
+                'label': QLabel('Maximum depth: ', view_parent),
+                'widget': QGroupBox('', view_parent),
+                'layout': QHBoxLayout()
+            },
+            'sample_split': {
+                'value': self.sample_split_input,
+                'label': QLabel('Minimum samples: ', view_parent),
+                'widget': QGroupBox('', view_parent),
+                'layout': QHBoxLayout()
+            },
+            'max_features': {
+                'value': self.max_features_input,
+                'label': QLabel('Split Features: ', view_parent),
+                'widget': QGroupBox('', view_parent),
+                'layout': QHBoxLayout()
+            },
+            'warm_start': {
+                'value': self.warm_start_input,
+                'label': QLabel('Warm Start: ', view_parent),
+                'widget': QGroupBox('', view_parent),
+                'layout': QHBoxLayout()
+            }
+        }
+        self.view = ClassifierWidget(classifier_name, classifier_number, self.network_widgets, view_parent)
+
+
+    def create_classifier(self):
+        trees = int(self.trees_input.text())
+        max_depth = str(self.max_depth_input.text())
+        if max_depth.lower() != 'none':
+            max_depth = int(max_depth)
+        else:
+            max_depth = None
+        sample_split = int(self.sample_split_input.text())
+        max_features = str(self.max_features_input.text())
+        if max_features.lower() != 'auto':
+            max_features = int(max_features)
+        warm_start = str(self.warm_start_input.currentText())
+        self.classifier_object = RandomForestClassifier(n_estimators=trees, max_depth=max_depth, min_samples_split=sample_split,
+                                                        max_features=max_features, warm_start=warm_start)
+
+    def train_classifier(self, X, y, shuffle=True):
+
+        total_data_len = len(self.input_dataset)
+        if len(str(self.view.info_type['training']['children']['train_data_size']['value'].text())) > 0:
+            train_size = int(self.view.info_type['training']['children']['train_data_size']['value'].text())
+        else:
+            train_size = 5
+        if len(str(self.view.info_type['training']['children']['test_data_size']['value'].text())) > 0:
+            test_size = int(self.view.info_type['training']['children']['test_data_size']['value'].text())
+        else:
+            test_size = 1
+        test_perc = test_size / (test_size + train_size)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_perc, random_state=42, shuffle=shuffle)
+        self.classifier_object.fit(X_train, y_train)
+        accuracy = self.classifier_object.score(X_test, y_test)
+        loss = 1 - accuracy
+        return accuracy, loss
+    def predict_classifier(self):
+        X = np.load(str(self.view.info_type['prediction']['children']['input_path']['value'].text()))
+        prediction = self.classifier_object.predict(X)
+        output_class = []
+        output_confidence = []
+        for i in range(len(prediction)):
+            index = np.argmax(prediction[i])
+            output_class.append(index)
+            output_confidence.append(prediction[i][index])
+        return output_class, output_confidence
