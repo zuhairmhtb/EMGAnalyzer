@@ -54,7 +54,7 @@ class ClassifierWidget:
 
         self.graphs = collections.OrderedDict()
         self.graphs['accuracy'] = None
-        self.graphs['loss'] = None
+        self.graphs['average accuracy'] = None
         self.graphs['data'] = None
 
         graph_code = 100

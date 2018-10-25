@@ -91,6 +91,7 @@ class MyTableWidget(QWidget):
         self.classification_handler = None
         self.classified_accuracies = []
         self.classified_loss = []
+        self.classifier_view_updated = False
         self.debug_mode = False
         self.data = self.get_dataset()
 
@@ -1009,6 +1010,8 @@ class MyTableWidget(QWidget):
         if show_in_tab:
             for i in range(len(outputs)):
                 self.muap_analysis_feature_widget_child_widgets[0][2][i].setText(outputs[i])
+                #if len(outputs_val[i]) > 0:
+                    #outputs_val[i] = np.average(outputs_val)
         return outputs_val
 
     def calculate_duration(self, muaps, output_classes, output_superimposition, firing_time, fs, signal, show_in_tab=True):
@@ -1030,6 +1033,8 @@ class MyTableWidget(QWidget):
         if show_in_tab:
             for i in range(len(outputs)):
                 self.muap_analysis_feature_widget_child_widgets[1][2][i].setText(outputs[i])
+                #if len(outputs_val[i]) > 0:
+                    #outputs_val[i] = np.average(outputs_val)
         return outputs_val
     def calculate_rect_area(self, muaps, output_classes, output_superimposition, firing_time, fs, signal, show_in_tab=True):
         peaks_thresh = -1
@@ -1050,6 +1055,8 @@ class MyTableWidget(QWidget):
         if show_in_tab:
             for i in range(len(outputs)):
                 self.muap_analysis_feature_widget_child_widgets[2][2][i].setText(outputs[i])
+                #if len(outputs_val[i]) > 0:
+                    #outputs_val[i] = np.average(outputs_val)
         return outputs_val
     def calculate_rise_time(self, muaps, output_classes, output_superimposition, firing_time, fs, signal, show_in_tab=True):
         peaks_thresh = -1
@@ -1070,6 +1077,8 @@ class MyTableWidget(QWidget):
         if show_in_tab:
             for i in range(len(outputs)):
                 self.muap_analysis_feature_widget_child_widgets[3][2][i].setText(outputs[i])
+                #if len(outputs_val[i]) > 0:
+                    #outputs_val[i] = np.average(outputs_val)
         return outputs_val
 
     def calculate_phases(self, muaps, output_classes, output_superimposition, firing_time, fs, signal, show_in_tab=True):
@@ -1091,6 +1100,8 @@ class MyTableWidget(QWidget):
         if show_in_tab:
             for i in range(len(outputs)):
                 self.muap_analysis_feature_widget_child_widgets[4][2][i].setText(outputs[i])
+                #if len(outputs_val[i]) > 0:
+                    #outputs_val[i] = np.average(outputs_val)
         return outputs_val
 
     def calculate_turns(self, muaps, output_classes, output_superimposition, firing_time, fs, signal, show_in_tab=True):
@@ -1112,6 +1123,8 @@ class MyTableWidget(QWidget):
         if show_in_tab:
             for i in range(len(outputs)):
                 self.muap_analysis_feature_widget_child_widgets[5][2][i].setText(outputs[i])
+                #if len(outputs_val[i]) > 0:
+                 #   outputs_val[i] = np.average(outputs_val)
         return outputs_val
 
     def calculate_firing_rate(self, muaps, output_classes, output_superimposition, firing_time, fs, signal, show_in_tab=True):
@@ -1392,7 +1405,15 @@ class MyTableWidget(QWidget):
             self.feature_type[ftype]["labels"][index].setText("{0:.5f}".format(vcf))
         return vcf
 
-
+    def calculate_tpf(self, signal, fs, ftype, index, show_in_tab=True):
+        window = self.segmentation_control_window.segment_window
+        window_len = int((fs * window) / 1000)
+        f, t, sxx = spectrogram(signal, fs, nperseg=window_len, mode='psd', scaling='density')
+        peaks, peaks_img = signal_analysis_functions.calculate_npf(sxx, np.mean(sxx.flatten()), window_len)
+        total = 0
+        for i in range(len(peaks)):
+            total += len(peaks[i])
+        return total
 
 
     def initSignalAnalysisOutputUI(self):
@@ -1416,11 +1437,11 @@ class MyTableWidget(QWidget):
             "Feature Domain": {
                 "features": ["Mean Frequency", "Median Frequency", "Average Maximum Density",
                              "Variance of Maximum Frequency", "Mean Power", "Peak Frequency",
-                             "Total Power", "Variance of Central Frequency",
+                             "Total Power", "Variance of Central Frequency", "Number of Peaks"
                              ],
                 "functions": [self.calculate_mnf, self.calculate_mdf, self.calculate_amd,
                               self.calculate_vmf, self.calculate_mnp, self.calculate_pkf,
-                              self.calculate_top, self.calculate_vcf],
+                              self.calculate_top, self.calculate_vcf, self.calculate_tpf],
                 "checkboxes": [],
                 "classification_checkboxes": [],
                 "labels": [],
@@ -1460,7 +1481,10 @@ class MyTableWidget(QWidget):
 
 
     def start_emg_classification_thread(self):
-
+        for k in self.classifiers:
+            self.classifiers[k].view.graphs['accuracy']['axis'].clear()
+            self.classifiers[k].view.graphs['average accuracy']['axis'].clear()
+            self.classifiers[k].view.graphs['data']['axis'].clear()
         if not (self.classification_handler is None):
             if self.classification_handler.current_classification_mode == self.classification_handler.classification_mode['Paused']:
                 self.classification_handler.current_classification_mode = self.classification_handler.classification_mode['Start']
@@ -1471,6 +1495,7 @@ class MyTableWidget(QWidget):
                 self.classification_handler.update_training_view_signal.connect(self.update_training_view)
                 self.classified_accuracies = [ [] for _ in range(len(self.classifiers))]
                 self.classified_loss = [[] for _ in range(len(self.classifiers))]
+                self.classifier_view_updated = False
                 for clf in self.classifiers:
                     self.classifiers[clf].create_classifier()
                 self.classification_handler.start()
@@ -1480,6 +1505,7 @@ class MyTableWidget(QWidget):
             self.classification_handler.update_training_view_signal.connect(self.update_training_view)
             self.classified_accuracies = [[] for _ in range(len(self.classifiers))]
             self.classified_loss = [[] for _ in range(len(self.classifiers))]
+            self.classifier_view_updated = False
             for clf in self.classifiers:
                 self.classifiers[clf].create_classifier()
             self.classification_handler.start()
@@ -1499,30 +1525,46 @@ class MyTableWidget(QWidget):
         features_np = np.asarray(features)
         labels = self.classification_handler.current_labels
         labels_np = np.asarray(labels)
-        if(len(features) > 5):
+        if(len(features) > self.classification_handler.min_train_data):
+            self.classifier_view_updated = True
             accuracies = []
             losses = []
             c = 0
             for k in self.classifiers:
-
+                print('Training with features of shape' + str(features_np.shape))
+                print(features)
                 accuracy, loss = self.classifiers[k].train_classifier(features, labels)
+                print('Classifier ' + k.upper() + ":")
+                print("Accuracy: " + str(accuracy))
+
                 self.classified_accuracies[c].append(accuracy)
                 self.classified_loss[c].append(loss)
+
+                print('Average Accuracy: ' + str(np.average(self.classified_accuracies[c])))
+                print('Dataset length: ' + str(len(features)))
 
                 self.classifiers[k].view.info_type["training"]["children"]["accuracy"]["value"].setText("{0:.3f}".format(accuracy*100))
                 self.classifiers[k].view.info_type["training"]["children"]["loss"]["value"].setText(
                     "{0:.3f}".format(loss * 100))
                 self.classifiers[k].view.graphs['accuracy']['axis'].clear()
                 self.classifiers[k].view.graphs['accuracy']["axis"].plot(self.classified_accuracies[c])
+                self.classifiers[k].view.graphs['accuracy']["axis"].grid(b=True)
                 self.classifiers[k].view.graphs['accuracy']["canvas"].draw()
-                self.classifiers[k].view.graphs['loss']['axis'].clear()
-                self.classifiers[k].view.graphs['loss']["axis"].plot(self.classified_loss[c])
-                self.classifiers[k].view.graphs['loss']["canvas"].draw()
+                #self.classifiers[k].view.graphs['average accuracy']['axis'].clear()
+                self.classifiers[k].view.graphs['average accuracy']["axis"].scatter(
+                    len(self.classified_accuracies[c]), np.average(self.classified_accuracies[c]))
+                self.classifiers[k].view.graphs['average accuracy']["axis"].grid(b=True)
+                self.classifiers[k].view.graphs['average accuracy']["canvas"].draw()
                 self.classifiers[k].view.graphs['data']['axis'].clear()
-                self.classifiers[k].view.graphs['data']['axis'].scatter(features_np[:, 0], features_np[:, 1])
+                #for i in range(features_np.shape[2]):
+                 #   self.classifiers[k].view.graphs['data']['axis'].scatter(features_np[:, 0, i], features_np[:, 1, i],
+                  #                                                          c=labels_np + 1+i)
+                self.classifiers[k].view.graphs['data']['axis'].scatter(features_np[:, 0], features_np[:, 1],
+                                                                        c=labels_np + 1)
+                self.classifiers[k].view.graphs['data']['axis'].grid(True)
                 self.classifiers[k].view.graphs['data']["canvas"].draw()
                 c += 1
-
+            self.classifier_view_updated = False
         if not (self.classification_handler is None):
             self.classification_control_progressbar.setValue(
                 int(len(self.classification_handler.current_data)*100/len(self.classification_handler.dataset))
@@ -1550,9 +1592,15 @@ class MyTableWidget(QWidget):
         self.classification_control_pause_btn.clicked.connect(self.pause_emg_classification_thread)
         self.classification_control_stop_btn = QPushButton("Stop", self)
         self.classification_control_stop_btn.clicked.connect(self.stop_emg_classification_thread)
+        self.classification_control_classification_type_select = QComboBox(self)
+        self.classification_control_classification_type_select.addItem('MUAP Classification')
+        self.classification_control_classification_type_select.addItem('Signal Classification')
+        self.classification_control_classification_type_select.addItem('Both')
+
         self.classification_tab_control_widget_layout.addWidget(self.classification_control_start_btn)
         self.classification_tab_control_widget_layout.addWidget(self.classification_control_pause_btn)
         self.classification_tab_control_widget_layout.addWidget(self.classification_control_stop_btn)
+        self.classification_tab_control_widget_layout.addWidget(self.classification_control_classification_type_select)
 
         self.classification_control_dataset_label = QLabel('Dataset URL:', self)
         self.classification_control_dataset_url = QLineEdit(self)

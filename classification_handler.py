@@ -29,6 +29,7 @@ class ClassificationHandlerThread(QtCore.QThread):
         self.dataset, self.labels = zip(*c)
         self.current_data = []
         self.current_labels = []
+        self.min_train_data = 10
         self.main_thread = parent
         self.classification_mode = {'Stop': 0, 'Start': 1, 'Paused': 2}
         self.current_classification_mode = self.classification_mode['Stop']
@@ -107,6 +108,9 @@ class ClassificationHandlerThread(QtCore.QThread):
             output_console_text += "Current MUAP Features: " + str(len(current_muap_features)) + "\n"
             #self.main_thread.classification_tab_output_label.setText(output_console_text)
             print(output_console_text)
+
+            classification_type = self.main_thread.classification_control_classification_type_select.currentText().lower()
+
             while (not (self.current_classification_mode == self.classification_mode['Stop'])) and current_index < len(self.dataset):
                 while self.current_classification_mode == self.classification_mode['Paused']:
                     self.sleep(2)
@@ -174,25 +178,39 @@ class ClassificationHandlerThread(QtCore.QThread):
                     for i in range(len(current_muap_features)):
                         features = self.main_thread.muap_analysis_feature_functions[current_muap_features[i][1]](waveforms, waveform_classes,
                                                                     waveform_superimposition, firing_time, fs, filtered)
-                        muap_features.append(features)
+
+                        for j in range(len(features)):
+                            if type(features[j]) == list or type(features[j]) == np.ndarray:
+                                if len(features[j]) > 0:
+                                    features[j] = np.average(features[j])
+                                else:
+                                    features[j] = 0
+                            muap_features.append(features[j])
+
 
                 else:
                     # Add 0 value for all MUAP Features and Each Motor Unit
                     for i in range(len(current_muap_features)):
-                        muap_features.append([0]*self.main_thread.output_motor_classes)
+                        for _ in range(self.main_thread.output_motor_classes):
+                            muap_features.append(0)
 
                 print('Signal Features: ' + str(len(signal_feature_data)))
                 print(signal_feature_data)
                 print('MUAP Features: ' + str(len(muap_features)))
                 print(muap_features)
-                self.current_data.append(signal_feature_data)
+                if classification_type == "muap classification":
+                    self.current_data.append(muap_features)
+                elif classification_type == "signal classification":
+                    self.current_data.append(signal_feature_data)
+                else:
+                    self.current_data.append(list(muap_features) + list(signal_feature_data))
                 self.current_labels.append(self.labels[current_index])
                 current_index += 1
 
 
-
-                self.update_training_view_signal.emit()
-                self.sleep(2)
+                if len(self.current_data) > self.min_train_data and (not self.main_thread.classifier_view_updated):
+                    self.update_training_view_signal.emit()
+                    self.sleep(2)
 
 
             self.current_classification_mode = self.classification_mode['Stop']
